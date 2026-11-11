@@ -5,7 +5,7 @@ Powered by NEXUS MEDIA. A Windows desktop app that turns a niche into scheduled 
 (Claude in Chrome), so you only need a Claude account and the extension.
 
 ## Download
-Get the latest installer from **[Releases](../../releases/latest)**: `YTA and FBA Studio Setup x.y.z.exe`.
+Get the latest installer from **[Releases](../../releases/latest)**: `YTA-and-FBA-Studio-Setup-x.y.z.exe`.
 Run it, pick an install folder, done. Windows SmartScreen may warn because the installer is not code-signed
 (More info, then Run anyway).
 

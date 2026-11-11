@@ -7,11 +7,14 @@
   "author": "NEXUS MEDIA",
   "license": "UNLICENSED",
   "homepage": "https://github.com/gendesu4work/yta-fba-studio",
-  "repository": { "type": "git", "url": "https://github.com/gendesu4work/yta-fba-studio.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gendesu4work/yta-fba-studio.git"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis",
-    "release": "electron-builder --win nsis --publish always"
+    "release": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "electron-updater": "^6.8.11",
@@ -26,10 +29,37 @@
     "appId": "com.shortsstudio.app",
     "productName": "YTA and FBA Studio",
     "asar": true,
-    "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**"],
-    "files": ["main.js", "preload.js", "lib/**", "renderer/**", "build/icon.ico", "build/icon.png", "package.json"],
-    "publish": [{ "provider": "github", "owner": "gendesu4work", "repo": "yta-fba-studio", "releaseType": "release" }],
-    "win": { "target": "nsis", "icon": "build/icon.ico", "signAndEditExecutable": false },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true }
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "renderer/**",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gendesu4work",
+        "repo": "yta-fba-studio",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "YTA-and-FBA-Studio-Setup-${version}.${ext}"
+    }
   }
 }

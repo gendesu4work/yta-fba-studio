@@ -17,5 +17,10 @@ jobs:
       - run: npm ci
       - run: node node_modules/electron/install.js
       - run: npm run release
+      - name: Publish release assets
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "YTA and FBA Studio ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/YTA-and-FBA-Studio-Setup-*.exe dist/*.blockmap dist/latest.yml --clobber
