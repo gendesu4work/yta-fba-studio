@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; media-src 'self' file:; style-src 'self' 'unsafe-inline'">
+<title>YTA and FBA Studio</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="tbar"><button id="tmin" title="Minimize">&#8211;</button><button id="tclose" class="x" title="Close">&#10005;</button></div>
+<aside id="side">
+  <div class="brand"><img src="logo.png" alt=""><div><b>YTA and FBA Studio</b><small>Powered by NEXUS MEDIA</small></div></div>
+  <nav>
+    <button data-view="setup" class="nav active">Setup</button>
+    <button data-view="create" class="nav">Create</button>
+    <button data-view="builder" class="nav">Builder</button>
+    <button data-view="music" class="nav">Music</button>
+    <button data-view="upload" class="nav">Upload &amp; Schedule</button>
+    <button data-view="settings" class="nav">Settings</button>
+  </nav>
+  <div class="daily"><div class="dl">Videos made today</div><div class="dbar"><span id="dailyFill"></span></div><div id="dailyTxt" class="muted">0 / 5</div></div>
+  <button class="link" id="openFolder">Open files folder</button>
+</aside>
+
+<main>
+  <section id="view-setup" class="view active"></section>
+  <section id="view-create" class="view"></section>
+  <section id="view-builder" class="view"></section>
+  <section id="view-music" class="view"></section>
+  <section id="view-upload" class="view"></section>
+  <section id="view-settings" class="view"></section>
+</main>
+
+<footer id="meter" class="idle">
+  <div class="mhead"><b id="mTitle">Idle</b><span id="mPct"></span><button id="mStop" class="danger small" hidden>Stop</button></div>
+  <div class="bar"><span id="mFill"></span></div>
+  <div id="mSteps" class="chips"></div>
+  <div id="mFeed" class="feed">Nothing running.</div>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
