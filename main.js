@@ -98,5 +98,6 @@ app.whenReady().then(() => {
   const up = updater.init({ app, engine });
   ipcMain.handle('appInfo', wrap(() => ({ version: app.getVersion(), packaged: app.isPackaged })));
   ipcMain.handle('updateCheck', wrap(() => up.check(true)));
+  ipcMain.handle('updateInstall', wrap(() => up.install()));
 });
 app.on('window-all-closed', () => app.quit());

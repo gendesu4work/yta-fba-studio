@@ -10,6 +10,21 @@ async function call(name, ...a) {
   return r.data;
 }
 
+// ---------- stable rendering: never replace buttons under the mouse ----------
+// 1) A view's HTML is only replaced when it actually changed (state updates arrive constantly while a task runs).
+//    Unchanged content keeps its elements, so a click that is in progress is never lost; handlers are simply re-bound.
+document.querySelectorAll('main .view').forEach((v) => {
+  const d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML'); let last = null;
+  Object.defineProperty(v, 'innerHTML', { configurable: true, get() { return d.get.call(this); }, set(h) { if (h === last && this.childElementCount) return; last = h; d.set.call(this, h); } });
+});
+// 2) While a mouse button is held down, redraws wait; they catch up right after the click has been delivered.
+let ptrDown = false;
+document.addEventListener('pointerdown', () => { ptrDown = true; }, true);
+const ptrUp = () => { if (!ptrDown) return; ptrDown = false; setTimeout(() => render(), 120); };
+document.addEventListener('pointerup', ptrUp, true);
+document.addEventListener('pointercancel', ptrUp, true);
+window.addEventListener('blur', () => { ptrDown = false; });
+
 // ---------- navigation ----------
 document.querySelectorAll('.nav').forEach((b) => b.addEventListener('click', () => { view = b.dataset.view; show(); }));
 $('#openFolder').onclick = () => call('openFolder', '');
@@ -189,6 +204,7 @@ function renderUpload() {
   const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
   $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences across the day (morning to late evening Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
   <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="jitter" ${S.settings.slotJitter !== false ? 'checked' : ''}><span class="tr"></span><b>Vary the minutes</b></label><span class="muted grow">Posts go out at natural-looking times (like 12:17 or 7:42 PM ET) instead of exactly on the hour. Or pick your own time on each video.</span></div></div>
+  <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="parup" ${S.settings.parallelUploads !== false ? 'checked' : ''}><span class="tr"></span><b>Upload to all platforms at once</b></label><span class="muted grow">YouTube, TikTok and Facebook are filled in at the same time in separate Chrome tabs. Turn it off if Chrome gets confused (they then go one after another).</span></div></div>
   <div class="card"><b>Next open slots</b><div class="muted">${S.slotsPreview.slice(0, 3).map((x) => `${x.local} (${x.et})`).join(' · ')}</div></div>
   ${cards || '<p class="muted">No finished videos yet. Make some on the Create tab.</p>'}${failed}
   ${jobs ? `<h2>Timed tasks (the app and Chrome must be open)</h2><div class="card">${jobs}</div>` : ''}`;
@@ -200,6 +216,7 @@ function renderUpload() {
   document.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => { const n = fixNotes[b.dataset.fix] || ''; delete fixNotes[b.dataset.fix]; call('fix', b.dataset.fix, n); }));
   document.querySelectorAll('[data-slotin]').forEach((i) => (i.onchange = () => call('customSlot', i.dataset.slotin, i.value ? new Date(i.value).getTime() : null)));
   document.querySelectorAll('[data-slotclr]').forEach((b) => (b.onclick = () => call('customSlot', b.dataset.slotclr, null)));
+  const pu = $('#parup'); if (pu) pu.onchange = (e) => call('settings', { parallelUploads: e.target.checked });
   const jt = $('#jitter'); if (jt) jt.onchange = (e) => call('settings', { slotJitter: e.target.checked });
   document.querySelectorAll('[data-apfix]').forEach((b) => (b.onclick = () => call('approveFix', b.dataset.apfix)));
   document.querySelectorAll('[data-dsfix]').forEach((b) => (b.onclick = () => call('discardFix', b.dataset.dsfix)));
@@ -274,8 +291,8 @@ function renderSettings() {
   <div class="card">${account ? `<div class="kv"><b>Status</b><span>${account.loggedIn ? 'Signed in' + (account.email ? ' as ' + esc(account.email) : '') : 'Signed out'}</span></div>` : '<div class="muted">Checking…</div>'}
     <div class="row" style="margin-top:12px">${account && account.loggedIn ? '<button class="danger" id="logout">Log out</button>' : '<button class="btn" id="login">Log in with Claude</button>'}<span class="muted tiny" style="margin:0">Log out to switch to a different Claude account. After logging in, run the Setup check again.</span></div></div>
   <h2>Updates</h2>
-  <div class="card"><div class="kv"><b>Version</b><span>${esc(appInfo.version || '')}</span></div><div class="kv"><b>Status</b><span><span class="badge ${/^Up to date/.test(s.updateStatus || '') ? 'done' : /fail|Could not/.test(s.updateStatus || '') ? 'failed' : /Download|Install|Checking/.test(s.updateStatus || '') ? 'waiting' : ''}">${esc(s.updateStatus || 'Not checked yet')}</span></span></div><div class="kv"><b>Last checked</b><span>${s.lastUpdateCheck ? new Date(s.lastUpdateCheck).toLocaleString() : 'never'}</span></div>
-    <div class="row" style="margin-top:12px"><button class="btn" id="upd" ${/Checking|Downloading|Installing/.test(s.updateStatus || '') ? 'disabled' : ''}>Check for updates</button><span class="muted tiny" style="margin:0">The app checks GitHub every 7 days and installs new versions automatically when it is idle.</span></div></div>
+  <div class="card"><div class="kv"><b>Version</b><span>${esc(appInfo.version || '')}</span></div><div class="kv"><b>Status</b><span><span class="badge ${/^Up to date/.test(s.updateStatus || '') ? 'done' : /fail|Could not/.test(s.updateStatus || '') ? 'failed' : /Download|Install|Checking|available/.test(s.updateStatus || '') ? 'waiting' : ''}">${esc(s.updateStatus || 'Not checked yet')}</span></span></div><div class="kv"><b>Last checked</b><span>${s.lastUpdateCheck ? new Date(s.lastUpdateCheck).toLocaleString() : 'never'}</span></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="upd" ${/Checking|Downloading|Installing/.test(s.updateStatus || '') ? 'disabled' : ''}>Check for updates</button>${s.updateAvailable && !/Downloading|Installing|downloaded/.test(s.updateStatus || '') ? `<button class="btn" id="updGo" style="background:#16a34a">Update app to ${esc(s.updateAvailable)}</button>` : ''}<span class="muted tiny" style="margin:0">The app checks GitHub every 7 days and installs new versions automatically when it is idle.</span></div></div>
   <h2>Your data</h2>
   <div class="card" id="dataCard"><span class="muted">Loading…</span></div>
   <h2>Usage today</h2>
@@ -288,6 +305,7 @@ function renderSettings() {
     <div class="kv"><b>Backups</b><span>${d.backups} automatic backups of your settings and queue (made on launch and before every update)</span></div><div class="kv"><b>Profile since</b><span>${new Date(d.since).toLocaleDateString()} · versions used: ${esc(d.versions.map((v) => v.v).join(', ') || 'this one')}</span></div>
     <div class="row" style="margin-top:12px"><button class="ghost" id="openData">Open folder</button><button class="ghost" id="bkNow">Back up now</button><span class="muted tiny" style="margin:0">Updates replace only the app. Your videos, audio, scripts, music, settings and schedule stay in this folder.</span></div>`;
     $('#openData').onclick = () => call('openFolder', ''); $('#bkNow').onclick = async () => { await call('backupNow'); renderSettings(); }; });
+  const ug = $('#updGo'); if (ug) ug.onclick = async () => { if (!confirm('Install the update now? The app closes, updates in place (your videos, settings and schedule are kept) and reopens by itself. Anything running will finish first.')) return; ug.disabled = true; ug.textContent = 'Updating…'; await call('updateInstall'); };
   const ub = $('#upd'); if (ub) ub.onclick = async () => { ub.disabled = true; await call('updateCheck'); };
   const lo = $('#logout'); if (lo) lo.onclick = async () => { if (!confirm('Log out of this Claude account? Any running task will stop.')) return; lo.disabled = true; const r = await window.api.authLogout(); account = r.ok ? r.data : { loggedIn: false }; renderSettings(); };
   const li = $('#login'); if (li) li.onclick = async () => { li.disabled = true; li.textContent = 'Finish signing in in your browser…'; const r = await window.api.authLogin(); account = r.ok ? r.data : { loggedIn: false }; renderSettings(); };
@@ -314,6 +332,7 @@ function renderAlert() {
 function render() {
   if (!S) return;
   applyTheme(); renderAlert();
+  if (ptrDown) return; // never rebuild the page between mouse-down and the click
   const used = S.usedToday; $('#dailyFill').style.width = (used / S.maxPerDay * 100) + '%'; $('#dailyTxt').textContent = `${used} / ${S.maxPerDay}`;
   if ([...document.querySelectorAll('#view-' + view + ' video')].some((v) => !v.paused && !v.ended)) return; // rebuilding would restart the video
   const el = document.activeElement;
