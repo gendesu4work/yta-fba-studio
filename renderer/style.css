@@ -81,3 +81,12 @@ body.borderless aside{-webkit-app-region:drag}body.borderless aside button{-webk
 /* no visible scrollbars (content still scrolls with wheel/touchpad/keys) */
 *{scrollbar-width:none}
 *::-webkit-scrollbar{display:none;width:0;height:0}
+
+.badge.stopped,.badge.running{background:var(--warn-s);color:var(--warn)}
+.rep{border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px}.rep.ok{background:var(--ok-s);color:var(--ok)}.rep.bad{background:var(--bad-s);color:var(--bad)}.rep.wait{background:var(--warn-s);color:var(--warn)}
+.rep ul{margin:4px 0 0 18px;padding:0}
+.fixbox{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:20}#modal[hidden]{display:none}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;width:min(520px,90vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.dlg h3{margin:0 0 4px;font-size:18px;color:var(--bad)}
+.errbox{background:var(--bad-s);color:var(--bad);border-radius:8px;padding:10px 12px;font-size:12.5px;max-height:140px;overflow:auto;word-break:break-word}

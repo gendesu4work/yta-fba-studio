@@ -38,8 +38,9 @@ function applyMode(m) {
 const wrap = (fn) => async (_e, ...a) => { try { return { ok: true, data: await fn(...a) }; } catch (e) { return { ok: false, error: e.message }; } };
 
 app.whenReady().then(() => {
-  const ws = path.join(app.getPath('documents'), 'Shorts Studio');
+  const ws = process.env.SS_WORKSPACE || path.join(app.getPath('documents'), 'Shorts Studio'); // SS_WORKSPACE is for testing only
   engine = new Engine(ws, send);
+  engine.noteVersion(app.getVersion());
   // long jobs are fire-and-forget: progress arrives through events
   const bg = (fn) => (...a) => { Promise.resolve().then(() => fn(...a)).catch((e) => { engine.feed('Error: ' + e.message); engine.finish(); }); return true; };
   ipcMain.handle('state', wrap(() => engine.publicState()));
@@ -72,6 +73,16 @@ app.whenReady().then(() => {
   }));
   ipcMain.handle('removeMusic', wrap((f) => engine.removeMusic(f)));
   ipcMain.handle('researchTrack', wrap(bg((f) => engine.researchTrack(f))));
+  ipcMain.handle('review', wrap(bg((s) => engine.reviewNow(s))));
+  ipcMain.handle('fix', wrap(bg((s) => engine.fixVideo(s))));
+  ipcMain.handle('approveFix', wrap((s) => engine.approveFix(s)));
+  ipcMain.handle('discardFix', wrap((s) => engine.discardFix(s)));
+  ipcMain.handle('retryUpload', wrap((s, p) => engine.retryUpload(s, p)));
+  ipcMain.handle('retryProduce', wrap((s) => engine.retryProduce(s)));
+  ipcMain.handle('alertRetry', wrap((id) => engine.retryAlert(id)));
+  ipcMain.handle('alertDismiss', wrap((id) => engine.dismissAlert(id)));
+  ipcMain.handle('dataInfo', wrap(() => engine.dataInfo()));
+  ipcMain.handle('backupNow', wrap(() => engine.backup('manual')));
   ipcMain.handle('winMode', wrap((m) => applyMode(m)));
   ipcMain.handle('winCtl', wrap((a) => { if (a === 'min') win.minimize(); else if (a === 'close') app.quit(); }));
   ipcMain.handle('authStatus', wrap(() => engine.authStatus()));

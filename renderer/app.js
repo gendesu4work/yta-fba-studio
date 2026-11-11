@@ -144,25 +144,52 @@ function renderCreate() {
 
 // ---------- upload & schedule ----------
 const PL = { youtube: 'YouTube Shorts', tiktok: 'TikTok', facebook: 'Facebook Reels', instagram: 'Instagram Reels' };
+const fmtWhen = (t) => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+const reportHtml = (r) => !r ? '' : r.ok
+  ? `<div class="rep ok">Checked: no problems found. Audio ${r.info.audioSeconds}s of ${r.info.voiceSeconds}s voice, captions in sync.</div>`
+  : `<div class="rep bad"><b>Problems found</b><ul>${r.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`;
 function renderUpload() {
   const recs = Object.entries(S.posts).filter(([, p]) => ['ready', 'making', 'failed'].includes(p.status));
   const ready = recs.filter(([, p]) => p.status === 'ready');
-  const cards = ready.map(([slug, p]) => `
-    <div class="card"><div class="row" style="align-items:flex-start;gap:16px"><video controls preload="metadata" src="${fileUrl(p.files.final)}"></video>
-    <div class="grow"><b>${esc(p.post.title)}</b><div class="muted">${Math.round(p.files.seconds)}s · ${esc(p.post.short_caption)}</div>${p.music ? `<div class="muted tiny">Music: ${p.music.file ? esc(p.music.file.replace(/\.[^.]+$/, '')) : 'none'} · ${esc(p.music.reason || '')}</div>` : ''}
-    ${p.accepted ? `<div style="margin:10px 0 6px"><b>Posting time:</b> ${new Date(p.slot).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })} <span class="muted">(US prime time)</span></div>
-      ${Object.entries(p.upload).map(([pl, u]) => `<div class="plat"><span class="badge ${u.status}">${u.status}</span><b>${PL[pl]}</b><span class="muted">${esc(u.detail || '')}</span></div>`).join('')}`
-      : `<div class="muted" style="margin:8px 0">Review the video. When you accept, it is scheduled on YouTube, TikTok and Facebook for the next US prime-time slot, and posted to Instagram at that time.</div>
-      <div class="row"><button class="btn" data-acc="${slug}" ${S.progress.active ? 'disabled' : ''}>Accept &amp; schedule</button><button class="danger" data-rej="${slug}">Reject</button></div>`}</div></div></div>`).join('');
-  const failed = recs.filter(([, p]) => p.status === 'failed').map(([, p]) => `<div class="card"><b>${esc(p.post.title)}</b> <span class="badge failed">failed</span><div class="muted">${esc(p.error || '')}</div></div>`).join('');
-  const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}">Retry</button><span class="muted">${esc(j.detail || '')}</span>` : ''}</div>`).join('');
-  $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences (8:00, 12:00, 3:30, 6:30 and 9:00 PM Eastern), spaced hours apart. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
+  const busy = S.progress.active;
+  const cards = ready.map(([slug, p]) => {
+    const fx = p.fix;
+    const fixBlock = !fx ? '' : fx.status === 'working' ? '<div class="rep wait">Fixing the video: re-timing the captions and rebuilding the audio…</div>'
+      : fx.status === 'failed' ? `<div class="rep bad">The fix failed: ${esc(fx.error || '')}</div>`
+      : `<div class="fixbox"><b>Fixed version</b><div class="row" style="align-items:flex-start;gap:14px;margin-top:8px"><video controls preload="metadata" src="${fileUrl(fx.files.final)}"></video><div class="grow">${reportHtml(fx.report)}
+          <div class="muted tiny">${p.upload && Object.values(p.upload).some((u) => u.status === 'scheduled') ? 'Approving replaces the video in your queued uploads: the old scheduled posts are removed and the fixed video is scheduled instead.' : 'Approving makes this the video that gets uploaded.'}</div>
+          <div class="row" style="margin-top:10px"><button class="btn" data-apfix="${slug}" ${busy ? 'disabled' : ''}>Approve fix</button><button class="ghost" data-dsfix="${slug}">Discard</button></div></div></div></div>`;
+    const plat = p.accepted ? Object.entries(p.upload || {}).map(([pl, u]) => {
+      const retry = ['failed', 'queued', 'stopped'].includes(u.status) && pl !== 'instagram';
+      const igRetry = pl === 'instagram' && ['failed', 'stopped'].includes(u.status);
+      return `<div class="plat"><span class="badge ${u.status}">${u.status}</span><b>${PL[pl]}</b>${u.when ? `<span class="muted">${fmtWhen(u.when)}</span>` : ''}<span class="muted grow" style="min-width:0">${esc((u.detail || '').slice(0, 140))}</span>${retry || igRetry ? `<button class="ghost small" data-retryup="${slug}|${pl}" ${busy ? 'disabled' : ''}>Retry upload</button>` : ''}</div>`;
+    }).join('') : '';
+    const anyRetry = p.accepted && Object.entries(p.upload || {}).some(([pl, u]) => pl !== 'instagram' && ['failed', 'queued', 'stopped'].includes(u.status));
+    return `<div class="card"><div class="row" style="align-items:flex-start;gap:16px"><video controls preload="metadata" src="${fileUrl(p.files.final)}"></video>
+      <div class="grow"><b>${esc(p.post.title)}</b><div class="muted">${Math.round(p.files.seconds)}s · ${esc(p.post.short_caption)}</div>${p.music ? `<div class="muted tiny">Music: ${p.music.file ? esc(p.music.file.replace(/\.[^.]+$/, '')) : 'none'} · ${esc(p.music.reason || '')}</div>` : ''}
+      <div class="row" style="margin:10px 0 4px"><button class="ghost" data-review="${slug}" ${busy ? 'disabled' : ''}>Review</button><button class="ghost" data-fix="${slug}" ${busy || (fx && fx.status === 'working') ? 'disabled' : ''}>Fix</button>
+        ${p.accepted ? '' : `<button class="btn" data-acc="${slug}" ${busy ? 'disabled' : ''}>Accept &amp; schedule</button><button class="danger" data-rej="${slug}">Reject</button>`}</div>
+      ${reportHtml(p.review)}
+      ${p.accepted ? `<div style="margin:10px 0 6px"><b>Posting time:</b> ${fmtWhen(p.slot)} <span class="muted">(US prime time, checked against the clock before each upload)</span></div>${plat}${anyRetry ? `<div style="margin-top:8px"><button class="btn small" data-retryall="${slug}" ${busy ? 'disabled' : ''}>Retry all unfinished uploads</button></div>` : ''}`
+        : '<div class="muted" style="margin:8px 0">Review the video. When you accept, it is scheduled on YouTube, TikTok and Facebook for the next US prime-time slot, and posted to Instagram at that time.</div>'}
+      </div></div>${fixBlock}</div>`;
+  }).join('');
+  const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span><button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
+  const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
+  $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences (8:00, 12:00, 3:30, 6:30 and 9:00 PM Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
   <div class="card"><b>Next open slots</b><div class="muted">${S.slotsPreview.slice(0, 3).map((x) => `${x.local} (${x.et})`).join(' · ')}</div></div>
   ${cards || '<p class="muted">No finished videos yet. Make some on the Create tab.</p>'}${failed}
   ${jobs ? `<h2>Timed tasks (the app and Chrome must be open)</h2><div class="card">${jobs}</div>` : ''}`;
   document.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => call('accept', b.dataset.acc)));
   document.querySelectorAll('[data-rej]').forEach((b) => (b.onclick = () => call('reject', b.dataset.rej)));
   document.querySelectorAll('[data-retry]').forEach((b) => (b.onclick = () => call('retryJob', b.dataset.retry)));
+  document.querySelectorAll('[data-review]').forEach((b) => (b.onclick = async () => { b.disabled = true; b.textContent = 'Checking…'; await call('review', b.dataset.review); }));
+  document.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => call('fix', b.dataset.fix)));
+  document.querySelectorAll('[data-apfix]').forEach((b) => (b.onclick = () => call('approveFix', b.dataset.apfix)));
+  document.querySelectorAll('[data-dsfix]').forEach((b) => (b.onclick = () => call('discardFix', b.dataset.dsfix)));
+  document.querySelectorAll('[data-retryup]').forEach((b) => (b.onclick = () => { const [s, pl] = b.dataset.retryup.split('|'); call('retryUpload', s, pl); }));
+  document.querySelectorAll('[data-retryall]').forEach((b) => (b.onclick = () => call('retryUpload', b.dataset.retryall, null)));
+  document.querySelectorAll('[data-retryprod]').forEach((b) => (b.onclick = () => call('retryProduce', b.dataset.retryprod)));
 }
 
 // ---------- builder ----------
@@ -224,11 +251,18 @@ function renderSettings() {
   <h2>Updates</h2>
   <div class="card"><div class="kv"><b>Version</b><span>${esc(appInfo.version || '')}</span></div><div class="kv"><b>Status</b><span><span class="badge ${/^Up to date/.test(s.updateStatus || '') ? 'done' : /fail|Could not/.test(s.updateStatus || '') ? 'failed' : /Download|Install|Checking/.test(s.updateStatus || '') ? 'waiting' : ''}">${esc(s.updateStatus || 'Not checked yet')}</span></span></div><div class="kv"><b>Last checked</b><span>${s.lastUpdateCheck ? new Date(s.lastUpdateCheck).toLocaleString() : 'never'}</span></div>
     <div class="row" style="margin-top:12px"><button class="btn" id="upd" ${/Checking|Downloading|Installing/.test(s.updateStatus || '') ? 'disabled' : ''}>Check for updates</button><span class="muted tiny" style="margin:0">The app checks GitHub every 7 days and installs new versions automatically when it is idle.</span></div></div>
+  <h2>Your data</h2>
+  <div class="card" id="dataCard"><span class="muted">Loading…</span></div>
   <h2>Usage today</h2>
   <div class="card"><div class="kv"><b>Claude runs</b><span>${u.runs}</span></div><div class="kv"><b>Tokens used</b><span>≈ ${fmtTok(u.fresh)} (plus ${fmtTok(u.cached)} cheap cached reads)</span></div><div class="muted tiny">Measured from each Claude run the app starts. Browser steps use the most; Sonnet uses far less than Opus.</div></div>`;
   document.querySelectorAll('#theme button').forEach((b) => (b.onclick = () => call('settings', { theme: b.dataset.v })));
   document.querySelectorAll('[data-ac]').forEach((b) => (b.onclick = () => call('settings', { accent: b.dataset.ac })));
   document.querySelectorAll('#winmode button').forEach((b) => (b.onclick = () => call('winMode', b.dataset.v)));
+  window.api.dataInfo().then((r) => { const d = r.ok && r.data; const el = $('#dataCard'); if (!d || !el) return; const gb = d.bytes / 1e9, sz = gb >= 1 ? gb.toFixed(1) + ' GB' : Math.round(d.bytes / 1e6) + ' MB';
+    el.innerHTML = `<div class="kv"><b>Folder</b><span style="word-break:break-all">${esc(d.folder)}</span></div><div class="kv"><b>Stored</b><span>${d.videos} finished videos · ${d.scripts} scripts · ${d.tracks} music tracks · ${d.references} references · ${sz}</span></div>
+    <div class="kv"><b>Backups</b><span>${d.backups} automatic backups of your settings and queue (made on launch and before every update)</span></div><div class="kv"><b>Profile since</b><span>${new Date(d.since).toLocaleDateString()} · versions used: ${esc(d.versions.map((v) => v.v).join(', ') || 'this one')}</span></div>
+    <div class="row" style="margin-top:12px"><button class="ghost" id="openData">Open folder</button><button class="ghost" id="bkNow">Back up now</button><span class="muted tiny" style="margin:0">Updates replace only the app. Your videos, audio, scripts, music, settings and schedule stay in this folder.</span></div>`;
+    $('#openData').onclick = () => call('openFolder', ''); $('#bkNow').onclick = async () => { await call('backupNow'); renderSettings(); }; });
   const ub = $('#upd'); if (ub) ub.onclick = async () => { ub.disabled = true; await call('updateCheck'); };
   const lo = $('#logout'); if (lo) lo.onclick = async () => { if (!confirm('Log out of this Claude account? Any running task will stop.')) return; lo.disabled = true; const r = await window.api.authLogout(); account = r.ok ? r.data : { loggedIn: false }; renderSettings(); };
   const li = $('#login'); if (li) li.onclick = async () => { li.disabled = true; li.textContent = 'Finish signing in in your browser…'; const r = await window.api.authLogin(); account = r.ok ? r.data : { loggedIn: false }; renderSettings(); };
@@ -237,10 +271,24 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => S &&
 $('#tmin').onclick = () => call('winCtl', 'min'); $('#tclose').onclick = () => call('winCtl', 'close');
 window.api.on('winmode', (m) => document.body.classList.toggle('borderless', m === 'borderless'));
 
+// ---------- failure pop-up ----------
+function renderAlert() {
+  const m = $('#modal'); const a = S.alerts && S.alerts[0];
+  if (!a) { m.hidden = true; return; }
+  if (m.dataset.id === a.id && !m.hidden) { $('#aMore').textContent = S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''; return; }
+  m.dataset.id = a.id; m.hidden = false;
+  m.innerHTML = `<div class="dlg"><h3>Process failed</h3><div class="muted" style="margin-bottom:6px">${esc(a.title)}</div><div class="errbox">${esc(a.detail || '')}</div>
+    <p>The app already retried this several times. Please open the site in Chrome and check it (a frozen or crashed tab, a logged-out account, a captcha, a full storage or credits limit), fix it, then press <b>Retry</b> to try again.</p>
+    <div class="muted tiny" id="aMore">${S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''}</div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="btn" id="aRetry" ${S.progress.active ? 'disabled' : ''}>Retry</button></div></div>`;
+  $('#aDis').onclick = () => call('alertDismiss', a.id);
+  $('#aRetry').onclick = () => call('alertRetry', a.id);
+}
+
 // ---------- render loop ----------
 function render() {
   if (!S) return;
-  applyTheme();
+  applyTheme(); renderAlert();
   const used = S.usedToday; $('#dailyFill').style.width = (used / S.maxPerDay * 100) + '%'; $('#dailyTxt').textContent = `${used} / ${S.maxPerDay}`;
   const el = document.activeElement;
   if (el && ['TEXTAREA', 'INPUT'].includes(el.tagName) && el.type !== 'range' && $('#view-' + view).contains(el)) return; // don't clobber typing
