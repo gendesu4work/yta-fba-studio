@@ -241,8 +241,8 @@ function renderBuilder() {
     <div class="row"><input type="text" id="memText" placeholder="e.g. No whispering in the voiceovers" style="flex:1;min-width:240px"><button class="btn" id="memAdd">Remember this</button></div>
     ${mem || '<div class="muted tiny" style="margin-top:8px">Nothing remembered yet.</div>'}
     ${mem ? '<div class="muted tiny" style="margin-top:8px">Applies to ideas and scripts made from now on. A script you already wrote keeps its text until you make a new one.</div>' : ''}</div>
-  <div class="card"><div class="row"><button class="btn" id="addFiles">Add video files</button><span class="muted">or paste a link</span><input type="text" id="refUrl" placeholder="https://www.tiktok.com/@…/video/… or YouTube Shorts link" style="flex:1;min-width:240px"><button class="ghost" id="addUrl">Learn from link</button></div>
-  <div class="muted tiny">Files are analyzed from sampled frames and cut pacing. Links are watched in your Chrome. The app learns technique only and writes new, original videos; it never copies characters, text or scenes.</div></div>
+  <div class="card"><div class="row"><button class="btn" id="addFiles">Add video files</button><span class="muted">or paste a link: the app downloads the video, then studies it</span><input type="text" id="refUrl" placeholder="TikTok, Instagram, Facebook or YouTube video link" style="flex:1;min-width:240px"><button class="ghost" id="addUrl">Learn from link</button></div>
+  <div class="muted tiny">Files are analyzed from sampled frames and cut pacing. Links are downloaded to your PC (the file is kept with the reference) and analyzed the same way; private or login-only videos can not be downloaded, so add those as a file. The app learns technique only and writes new, original videos; it never copies characters, text or scenes.</div></div>
   ${refs || '<p class="muted">No reference videos yet.</p>'}`;
   const addMem = async () => { const t = $('#memText').value.trim(); if (t) { await call('addMemory', t); } };
   $('#memAdd').onclick = addMem; $('#memText').onkeydown = (e) => { if (e.key === 'Enter') addMem(); };
@@ -258,13 +258,18 @@ function renderBuilder() {
 // ---------- music ----------
 function renderMusic() {
   const rows = S.tracks.map((t) => `<div class="track"><div class="grow"><b>${esc(t.file.replace(/\.[^.]+$/, ''))}</b>
-    <div class="muted">${t.vibe ? `${esc(t.vibe)} · ${esc(t.energy || '')} energy${t.genre ? ' · ' + esc(t.genre) : ''}${t.artist ? ' · ' + esc(t.artist) : ''}` : 'Vibe not researched yet'}</div>
+    <div class="muted">${t.vibe ? `${esc(t.vibe)} · ${esc(t.energy || '')} energy${t.genre ? ' · ' + esc(t.genre) : ''}${t.artist ? ' · ' + esc(t.artist) : ''}` : 'Vibe not researched yet'}${t.source ? ' · from YouTube' : ''}</div>
     ${t.mood ? `<div class="muted tiny">${esc(t.mood)}${t.confidence === 'low' ? ' (low confidence, inferred from the title)' : ''}</div>` : ''}</div>
     <audio controls preload="none" src="${fileUrl(t.path)}"></audio><button class="ghost small" data-research="${esc(t.file)}" ${S.progress.active ? 'disabled' : ''}>${t.vibe ? 'Re-research' : 'Research'}</button><button class="danger small" data-rm="${esc(t.file)}">Remove</button></div>`).join('');
   $('#view-music').innerHTML = `<h1>Music</h1><p class="sub">Your background tracks. When you add one, the app researches its title online to learn its vibe, so Automatic mode can match the right track to each video.</p>
   <div class="card"><div class="row"><button class="btn" id="addMusic">Add music</button><span class="muted">MP3, WAV or M4A. Only use music you have the rights to use.</span></div></div>
+  <div class="card"><b>Get MP3 from a YouTube link</b>
+    <div class="row" style="margin-top:8px"><input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…" style="flex:1;min-width:260px"><button class="btn" id="ytGo" ${S.progress.active ? 'disabled' : ''}>Download MP3</button></div>
+    <label class="row" style="margin-top:8px;gap:8px;align-items:flex-start"><input type="checkbox" id="ytRights"><span class="muted">I own this track, or it is royalty-free / licensed for use in my videos (for example from YouTube's Audio Library or a Creative Commons track with credit).</span></label>
+    <div class="muted tiny" style="margin-top:6px">Heads up: downloading from YouTube can go against YouTube's terms, and popular songs usually trigger copyright claims that block monetization. Safe choices are the YouTube Audio Library, tracks that say "no copyright" or "royalty free", or music you bought a license for. The first download also fetches the free open-source tool yt-dlp (about 18 MB) from its official GitHub page and checks its checksum.</div></div>
   <div class="card">${rows || '<span class="muted">No tracks yet.</span>'}</div>`;
   $('#addMusic').onclick = () => call('musicFiles');
+  $('#ytGo').onclick = async () => { const u = $('#ytUrl').value.trim(); if (!u) return alert('Paste a YouTube link first.'); if (!$('#ytRights').checked) return alert('Tick the box to confirm you are allowed to use this track in your videos.'); if (await call('ytMusic', u, true)) $('#ytUrl').value = ''; };
   document.querySelectorAll('[data-research]').forEach((b) => (b.onclick = () => call('researchTrack', b.dataset.research)));
   document.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { if (confirm('Remove this track from the app?')) call('removeMusic', b.dataset.rm); }));
 }
@@ -318,13 +323,21 @@ window.api.on('winmode', (m) => document.body.classList.toggle('borderless', m =
 function renderAlert() {
   const m = $('#modal'); const a = S.alerts && S.alerts[0];
   if (!a) { m.hidden = true; return; }
-  if (m.dataset.id === a.id && !m.hidden) { $('#aMore').textContent = S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''; return; }
+  const more = S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : '';
+  const advice = (a.diagnosis ? `<b>What went wrong:</b> ${esc(a.diagnosis)}` : '') + (a.advice ? `<div style="margin-top:6px"><b>What to do:</b> ${esc(a.advice)}</div>` : '');
+  if (m.dataset.id === a.id && !m.hidden) {
+    $('#aMore').textContent = more; $('#aAdvice').innerHTML = advice; $('#aAdvice').hidden = !advice;
+    const fb = $('#aFix'); if (fb && !fb.dataset.clicked) { fb.disabled = !!a.fixing; fb.textContent = a.fixing ? 'Looking for a fix…' : 'Find a fix'; }
+    return;
+  }
   m.dataset.id = a.id; m.hidden = false;
   m.innerHTML = `<div class="dlg"><h3>Process failed</h3><div class="muted" style="margin-bottom:6px">${esc(a.title)}</div><div class="errbox">${esc(a.detail || '')}</div>
-    <p>The app already retried this several times. Please open the site in Chrome and check it (a frozen or crashed tab, a logged-out account, a captcha, a full storage or credits limit), fix it, then press <b>Retry</b> to try again.</p>
+    <div class="errbox" id="aAdvice" style="background:rgba(22,163,74,.12);color:inherit" ${advice ? '' : 'hidden'}>${advice}</div>
+    <p>Press <b>Find a fix</b> and the app works out the cause, fixes it where it can, and retries by itself. If it needs something from you (a sign-in, Chrome, credits), it tells you exactly what. <b>Retry</b> tries again unchanged.</p>
     <div class="muted tiny" id="aMore">${S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''}</div>
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="btn" id="aRetry">Retry</button></div></div>`;
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="ghost" id="aRetry">Retry</button><button class="btn" id="aFix">Find a fix</button></div></div>`;
   $('#aDis').onclick = () => call('alertDismiss', a.id);
+  $('#aFix').onclick = async () => { const b = $('#aFix'); b.dataset.clicked = '1'; b.disabled = true; b.textContent = 'Looking for a fix…'; await call('alertFix', a.id); delete b.dataset.clicked; };
   $('#aRetry').onclick = async () => { const b = $('#aRetry'); b.disabled = true; b.textContent = S.progress.active ? 'Queued…' : 'Retrying…'; await call('alertRetry', a.id); };
 }
 

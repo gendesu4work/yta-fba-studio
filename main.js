@@ -63,7 +63,7 @@ app.whenReady().then(() => {
     r.filePaths.forEach((f) => bg(() => engine.addRef(f, 'file'))());
     return r.filePaths.length;
   }));
-  ipcMain.handle('refUrl', wrap((u) => { if (!/^https:\/\//.test(u)) throw new Error('Paste a full https:// link.'); bg(() => engine.addRef(u, 'url'))(); return true; }));
+  ipcMain.handle('refUrl', wrap((u) => { if (!require('./lib/ytdl').VIDEO_OK.test(String(u).trim())) throw new Error('Paste the full link of a YouTube, TikTok, Instagram or Facebook video.'); u = String(u).trim(); bg(() => engine.addRef(u, 'url'))(); return true; }));
   ipcMain.handle('addMemory', wrap((t) => engine.addMemory(t)));
   ipcMain.handle('toggleMemory', wrap((id, on) => engine.toggleMemory(id, on)));
   ipcMain.handle('removeMemory', wrap((id) => engine.removeMemory(id)));
@@ -74,6 +74,7 @@ app.whenReady().then(() => {
     if (r.canceled) return 0;
     engine.addMusic(r.filePaths); return r.filePaths.length;
   }));
+  ipcMain.handle('ytMusic', wrap((u, r) => { const p = engine.youtubeMusic(u, r); p.catch((e) => { engine.feed('Error: ' + e.message); engine.finish(); }); return true; }));
   ipcMain.handle('removeMusic', wrap((f) => engine.removeMusic(f)));
   ipcMain.handle('researchTrack', wrap(bg((f) => engine.researchTrack(f))));
   ipcMain.handle('review', wrap(bg((s) => engine.reviewNow(s))));
@@ -83,6 +84,7 @@ app.whenReady().then(() => {
   ipcMain.handle('discardFix', wrap((s) => engine.discardFix(s)));
   ipcMain.handle('retryUpload', wrap((s, p) => engine.retryUpload(s, p)));
   ipcMain.handle('retryProduce', wrap((s) => engine.retryProduce(s)));
+  ipcMain.handle('alertFix', wrap(bg((id) => engine.fixAlert(id))));
   ipcMain.handle('alertRetry', wrap((id) => engine.retryAlert(id)));
   ipcMain.handle('alertDismiss', wrap((id) => engine.dismissAlert(id)));
   ipcMain.handle('dataInfo', wrap(() => engine.dataInfo()));
