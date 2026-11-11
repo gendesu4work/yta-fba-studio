@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   refFiles: call('refFiles'), refUrl: call('refUrl'), toggleLesson: call('toggleLesson'), removeRef: call('removeRef'),
   musicFiles: call('musicFiles'), removeMusic: call('removeMusic'), researchTrack: call('researchTrack'),
   winMode: call('winMode'), winCtl: call('winCtl'), authStatus: call('authStatus'), authLogout: call('authLogout'), authLogin: call('authLogin'),
-  review: call('review'), fix: call('fix'), approveFix: call('approveFix'), discardFix: call('discardFix'), retryUpload: call('retryUpload'),
+  review: call('review'), customSlot: call('customSlot'), fix: call('fix'), approveFix: call('approveFix'), discardFix: call('discardFix'), retryUpload: call('retryUpload'),
   retryProduce: call('retryProduce'), alertRetry: call('alertRetry'), alertDismiss: call('alertDismiss'), dataInfo: call('dataInfo'), backupNow: call('backupNow'),
   appInfo: call('appInfo'), updateCheck: call('updateCheck'),
   openFolder: call('openFolder'), openUrl: call('openUrl'),

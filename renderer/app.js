@@ -74,12 +74,20 @@ function renderSetup() {
 }
 
 // ---------- create ----------
+const viralColor = (n) => (n >= 75 ? '#16a34a' : n >= 55 ? '#f59e0b' : '#ef4444');
+function viralHtml(v) {
+  if (!v) return '';
+  const sub = [['Hook', v.hook], ['Retention', v.retention], ['Shares', v.shares], ['Trend', v.trend], ['Relatable', v.relatable]];
+  return `<div class="viral"><div class="vtop"><b style="color:${viralColor(v.score)}">${v.score}% viral potential</b><div class="vbar"><span style="width:${v.score}%;background:${viralColor(v.score)}"></span></div></div>
+    <div class="vsubs">${sub.map(([l, n]) => `<span title="${l}: ${n}/100"><i>${l}</i> ${n}</span>`).join('')}</div>
+    ${v.why ? `<div class="muted tiny">${esc(v.why)}</div>` : ''}<div class="muted tiny">AI estimate, not a guarantee.</div></div>`;
+}
 function renderCreate() {
   const s = S.settings, left = Math.max(0, S.maxPerDay - S.usedToday), cap = Math.min(5, left);
   const nicheCards = S.niches.map((n) => `<button class="niche ${s.niche === n.id ? 'sel' : ''}" data-niche="${n.id}"><b>${n.name}</b><span>${esc(n.blurb)}</span></button>`).join('');
   const ideas = S.ideas.map((i) => {
     const on = S.selected.includes(i.id), off = !on && S.selected.length >= cap;
-    return `<div class="idea ${on ? 'sel' : ''} ${off ? 'off' : ''}" data-idea="${i.id}"><div class="ck">${on ? '✓' : ''}</div><div><b>${esc(i.title)}</b> <span class="tag">${esc(i.hookType)}</span><div class="hook">“${esc(i.hook)}”</div><div>${esc(i.premise)}</div><div class="muted">Takeaway: ${esc(i.takeaway)}</div></div></div>`;
+    return `<div class="idea ${on ? 'sel' : ''} ${off ? 'off' : ''}" data-idea="${i.id}"><div class="ck">${on ? '✓' : ''}</div><div><b>${esc(i.title)}</b> <span class="tag">${esc(i.hookType)}</span><div class="hook">“${esc(i.hook)}”</div><div>${esc(i.premise)}</div><div class="muted">Takeaway: ${esc(i.takeaway)}</div>${viralHtml(i.virality)}</div></div>`;
   }).join('');
   const scripts = Object.entries(S.posts).filter(([, p]) => p.status === 'script').map(([slug, p]) => `
     <div class="card" data-slug="${slug}"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge ${p.approved ? 'done' : 'waiting'}">${p.approved ? 'Approved' : 'Needs approval'}</span></div>
@@ -99,7 +107,7 @@ function renderCreate() {
   <h2 style="margin-top:0">1 · Choose your niche</h2><div class="grid">${nicheCards}</div>
   ${s.niche === 'custom' ? `<label class="f">Describe your niche</label><input type="text" id="customNiche" value="${esc(s.customNiche)}" placeholder="e.g. cozy cat stories, space facts for kids…">` : ''}
   <h2>2 · Create the idea for the day</h2>
-  <div class="card"><div class="row"><div class="grow"><b>Today's ideas for ${esc((S.niches.find((n) => n.id === s.niche) || {}).name)}</b><div class="muted">Claude writes 10 fresh ideas. Choose 1 to ${cap} (max 5 a day to keep your content original). ${S.usedToday}/${S.maxPerDay} made today.</div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Today's ideas for ${esc((S.niches.find((n) => n.id === s.niche) || {}).name)}</b><div class="muted">Claude writes 10 fresh ideas, each with an estimated viral potential. Choose 1 to ${cap} (max 5 a day to keep your content original). ${S.usedToday}/${S.maxPerDay} made today.</div></div>
   <button class="btn" id="mkIdeas" ${S.progress.active || left <= 0 ? 'disabled' : ''}>${S.ideas.length ? 'Create new ideas' : 'Create'}</button></div></div>
   ${ideas ? `<div class="row" style="margin:8px 0"><b>${S.selected.length} of ${cap} selected</b></div>${ideas}<button class="btn" id="mkScripts" ${!S.selected.length || S.progress.active ? 'disabled' : ''}>Write scripts for ${S.selected.length || ''} selected</button>` : ''}
   <h2>3 · Scripts &amp; visuals</h2>
@@ -145,6 +153,8 @@ function renderCreate() {
 // ---------- upload & schedule ----------
 const PL = { youtube: 'YouTube Shorts', tiktok: 'TikTok', facebook: 'Facebook Reels', instagram: 'Instagram Reels' };
 const fmtWhen = (t) => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+const fixNotes = {};
+const toLocalInput = (t) => { if (!t) return ''; const d = new Date(t), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 const reportHtml = (r) => !r ? '' : r.ok
   ? `<div class="rep ok">Checked: no problems found. Audio ${r.info.audioSeconds}s of ${r.info.voiceSeconds}s voice, captions in sync.</div>`
   : `<div class="rep bad"><b>Problems found</b><ul>${r.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`;
@@ -167,16 +177,18 @@ function renderUpload() {
     const anyRetry = p.accepted && Object.entries(p.upload || {}).some(([pl, u]) => pl !== 'instagram' && ['failed', 'queued', 'stopped'].includes(u.status));
     return `<div class="card"><div class="row" style="align-items:flex-start;gap:16px"><video controls preload="metadata" src="${fileUrl(p.files.final)}"></video>
       <div class="grow"><b>${esc(p.post.title)}</b><div class="muted">${Math.round(p.files.seconds)}s · ${esc(p.post.short_caption)}</div>${p.music ? `<div class="muted tiny">Music: ${p.music.file ? esc(p.music.file.replace(/\.[^.]+$/, '')) : 'none'} · ${esc(p.music.reason || '')}</div>` : ''}
-      <div class="row" style="margin:10px 0 4px"><button class="ghost" data-review="${slug}" ${busy ? 'disabled' : ''}>Review</button><button class="ghost" data-fix="${slug}" ${busy || (fx && fx.status === 'working') ? 'disabled' : ''}>Fix</button>
+      <div class="row" style="margin:10px 0 4px"><button class="ghost" data-review="${slug}" ${busy ? 'disabled' : ''}>Review</button><input type="text" class="fixnote" data-fixnote="${slug}" value="${esc(fixNotes[slug] || '')}" placeholder="What needs fixing? e.g. visuals change too early" style="flex:1;min-width:200px"><button class="ghost" data-fix="${slug}" ${busy || (fx && fx.status === 'working') ? 'disabled' : ''}>Fix</button>
         ${p.accepted ? '' : `<button class="btn" data-acc="${slug}" ${busy ? 'disabled' : ''}>Accept &amp; schedule</button><button class="danger" data-rej="${slug}">Reject</button>`}</div>
       ${reportHtml(p.review)}
       ${p.accepted ? `<div style="margin:10px 0 6px"><b>Posting time:</b> ${fmtWhen(p.slot)} <span class="muted">(US prime time, checked against the clock before each upload)</span></div>${plat}${anyRetry ? `<div style="margin-top:8px"><button class="btn small" data-retryall="${slug}" ${busy ? 'disabled' : ''}>Retry all unfinished uploads</button></div>` : ''}`
-        : '<div class="muted" style="margin:8px 0">Review the video. When you accept, it is scheduled on YouTube, TikTok and Facebook for the next US prime-time slot, and posted to Instagram at that time.</div>'}
+        : `<div class="row" style="margin:8px 0"><label class="muted">Post at (optional, your local time):</label><input type="datetime-local" data-slotin="${slug}" value="${toLocalInput(p.customSlot)}" style="width:210px"><button class="ghost small" data-slotclr="${slug}" ${p.customSlot ? '' : 'hidden'}>Use automatic time</button></div>
+        <div class="muted" style="margin:0 0 8px">${p.customSlot ? 'It will be scheduled for the time you chose.' : 'Leave it empty and it is scheduled for the next US prime-time slot (at a slightly different minute each time, like 12:17 or 7:42 PM ET), and posted to Instagram at that time.'}</div>`}
       </div></div>${fixBlock}</div>`;
   }).join('');
   const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span><button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
   const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
-  $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences (8:00, 12:00, 3:30, 6:30 and 9:00 PM Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
+  $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences across the day (morning to late evening Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
+  <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="jitter" ${S.settings.slotJitter !== false ? 'checked' : ''}><span class="tr"></span><b>Vary the minutes</b></label><span class="muted grow">Posts go out at natural-looking times (like 12:17 or 7:42 PM ET) instead of exactly on the hour. Or pick your own time on each video.</span></div></div>
   <div class="card"><b>Next open slots</b><div class="muted">${S.slotsPreview.slice(0, 3).map((x) => `${x.local} (${x.et})`).join(' · ')}</div></div>
   ${cards || '<p class="muted">No finished videos yet. Make some on the Create tab.</p>'}${failed}
   ${jobs ? `<h2>Timed tasks (the app and Chrome must be open)</h2><div class="card">${jobs}</div>` : ''}`;
@@ -184,7 +196,11 @@ function renderUpload() {
   document.querySelectorAll('[data-rej]').forEach((b) => (b.onclick = () => call('reject', b.dataset.rej)));
   document.querySelectorAll('[data-retry]').forEach((b) => (b.onclick = () => call('retryJob', b.dataset.retry)));
   document.querySelectorAll('[data-review]').forEach((b) => (b.onclick = async () => { b.disabled = true; b.textContent = 'Checking…'; await call('review', b.dataset.review); }));
-  document.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => call('fix', b.dataset.fix)));
+  document.querySelectorAll('[data-fixnote]').forEach((i) => { i.oninput = () => { fixNotes[i.dataset.fixnote] = i.value; }; i.onkeydown = (e) => { if (e.key === 'Enter') { const b = document.querySelector(`[data-fix="${i.dataset.fixnote}"]`); if (b && !b.disabled) b.click(); } }; });
+  document.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => { const n = fixNotes[b.dataset.fix] || ''; delete fixNotes[b.dataset.fix]; call('fix', b.dataset.fix, n); }));
+  document.querySelectorAll('[data-slotin]').forEach((i) => (i.onchange = () => call('customSlot', i.dataset.slotin, i.value ? new Date(i.value).getTime() : null)));
+  document.querySelectorAll('[data-slotclr]').forEach((b) => (b.onclick = () => call('customSlot', b.dataset.slotclr, null)));
+  const jt = $('#jitter'); if (jt) jt.onchange = (e) => call('settings', { slotJitter: e.target.checked });
   document.querySelectorAll('[data-apfix]').forEach((b) => (b.onclick = () => call('approveFix', b.dataset.apfix)));
   document.querySelectorAll('[data-dsfix]').forEach((b) => (b.onclick = () => call('discardFix', b.dataset.dsfix)));
   document.querySelectorAll('[data-retryup]').forEach((b) => (b.onclick = () => { const [s, pl] = b.dataset.retryup.split('|'); call('retryUpload', s, pl); }));
@@ -290,6 +306,7 @@ function render() {
   if (!S) return;
   applyTheme(); renderAlert();
   const used = S.usedToday; $('#dailyFill').style.width = (used / S.maxPerDay * 100) + '%'; $('#dailyTxt').textContent = `${used} / ${S.maxPerDay}`;
+  if ([...document.querySelectorAll('#view-' + view + ' video')].some((v) => !v.paused && !v.ended)) return; // rebuilding would restart the video
   const el = document.activeElement;
   if (el && ['TEXTAREA', 'INPUT'].includes(el.tagName) && el.type !== 'range' && $('#view-' + view).contains(el)) return; // don't clobber typing
   ({ setup: renderSetup, create: renderCreate, builder: renderBuilder, music: renderMusic, upload: renderUpload, settings: renderSettings })[view]();
@@ -297,5 +314,7 @@ function render() {
 window.api.on('state', (s) => { S = s; render(); renderMeter(S.progress); });
 window.api.on('progress', (p) => { if (S) S.progress = p; renderMeter(p); });
 // when typing ends, refresh once
-document.addEventListener('focusout', () => setTimeout(render, 150));
+document.addEventListener('focusout', (e) => { if (e.target && e.target.tagName === 'VIDEO') return; setTimeout(render, 150); });
+// when a video is paused or ends, catch up on anything that changed while it was playing
+document.addEventListener('pause', () => setTimeout(render, 300), true);
 (async () => { const r = await window.api.state(); S = r.data; if (S.setup.checkedAt) view = 'create'; applyTheme(); show(); renderMeter(S.progress); loadAccount(); })();
