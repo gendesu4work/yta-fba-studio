@@ -167,7 +167,7 @@ function renderUpload() {
     const fixBlock = !fx ? '' : fx.status === 'working' ? '<div class="rep wait">Fixing the video: re-timing the captions and rebuilding the audio…</div>'
       : fx.status === 'failed' ? `<div class="rep bad">The fix failed: ${esc(fx.error || '')}</div>`
       : `<div class="fixbox"><b>Fixed version</b><div class="row" style="align-items:flex-start;gap:14px;margin-top:8px"><video controls preload="metadata" src="${fileUrl(fx.files.final)}"></video><div class="grow">${reportHtml(fx.report)}
-          <div class="muted tiny">${p.upload && Object.values(p.upload).some((u) => u.status === 'scheduled') ? 'Approving replaces the video in your queued uploads: the old scheduled posts are removed and the fixed video is scheduled instead.' : 'Approving makes this the video that gets uploaded.'}</div>
+          <div class="muted tiny">${p.upload && Object.values(p.upload).some((u) => u.status === 'scheduled') ? 'Approving replaces the old video with this one. It is NOT posted yet: press Accept &amp; schedule again, and the old scheduled posts are replaced then.' : 'Approving replaces the old video with this one. It is NOT scheduled yet: press Accept &amp; schedule afterwards.'}</div>
           <div class="row" style="margin-top:10px"><button class="btn" data-apfix="${slug}" ${busy ? 'disabled' : ''}>Approve fix</button><button class="ghost" data-dsfix="${slug}">Discard</button></div></div></div></div>`;
     const plat = p.accepted ? Object.entries(p.upload || {}).map(([pl, u]) => {
       const retry = ['failed', 'queued', 'stopped'].includes(u.status) && pl !== 'instagram';
@@ -218,10 +218,19 @@ function renderBuilder() {
         <div class="muted">${esc(r.summary || (r.status === 'analyzing' ? 'Analyzing how this video is made…' : r.error || ''))}${r.meta ? ` · ${r.meta.seconds}s · ${r.meta.cuts} cuts` : ''}</div></div>
       <div class="row"><label class="switch" title="Use this video's lessons"><input type="checkbox" data-refon="${r.id}" ${r.on !== false ? 'checked' : ''}><span class="tr"></span></label><button class="danger small" data-refdel="${r.id}">Remove</button></div></div>
     ${r.on !== false ? (r.lessons || []).map((l) => `<div class="lesson ${l.on ? '' : 'off'}"><label class="switch"><input type="checkbox" data-les="${r.id}|${l.id}" ${l.on ? 'checked' : ''}><span class="tr"></span></label><div class="t"><div class="cat">${CAT[l.cat] || l.cat}</div>${esc(l.text)}</div></div>`).join('') : ''}</div>`).join('');
+  const mem = (S.memory || []).map((m) => `<div class="lesson ${m.on ? '' : 'off'}"><label class="switch"><input type="checkbox" data-memon="${m.id}" ${m.on ? 'checked' : ''}><span class="tr"></span></label><div class="t">${esc(m.text)}</div><button class="danger small" data-memdel="${m.id}">Remove</button></div>`).join('');
   $('#view-builder').innerHTML = `<h1>Builder</h1><p class="sub">Add animations you like. The app studies how each one is made (especially the art style) and applies it to your next videos. Turn any lesson on or off at any time.</p>
+  <div class="card"><h2 style="margin-top:0">Memory</h2><div class="muted" style="margin-bottom:8px">Tell the app what you want (or don't want) in your videos. Every item below is remembered and applied to every new idea and script until you turn it off or remove it. Examples: "No whispering in the voiceovers", "Always end with a question", "Keep the stickman in a blue shirt".</div>
+    <div class="row"><input type="text" id="memText" placeholder="e.g. No whispering in the voiceovers" style="flex:1;min-width:240px"><button class="btn" id="memAdd">Remember this</button></div>
+    ${mem || '<div class="muted tiny" style="margin-top:8px">Nothing remembered yet.</div>'}
+    ${mem ? '<div class="muted tiny" style="margin-top:8px">Applies to ideas and scripts made from now on. A script you already wrote keeps its text until you make a new one.</div>' : ''}</div>
   <div class="card"><div class="row"><button class="btn" id="addFiles">Add video files</button><span class="muted">or paste a link</span><input type="text" id="refUrl" placeholder="https://www.tiktok.com/@…/video/… or YouTube Shorts link" style="flex:1;min-width:240px"><button class="ghost" id="addUrl">Learn from link</button></div>
   <div class="muted tiny">Files are analyzed from sampled frames and cut pacing. Links are watched in your Chrome. The app learns technique only and writes new, original videos; it never copies characters, text or scenes.</div></div>
   ${refs || '<p class="muted">No reference videos yet.</p>'}`;
+  const addMem = async () => { const t = $('#memText').value.trim(); if (t) { await call('addMemory', t); } };
+  $('#memAdd').onclick = addMem; $('#memText').onkeydown = (e) => { if (e.key === 'Enter') addMem(); };
+  document.querySelectorAll('[data-memon]').forEach((c) => (c.onchange = () => call('toggleMemory', c.dataset.memon, c.checked)));
+  document.querySelectorAll('[data-memdel]').forEach((b) => (b.onclick = () => call('removeMemory', b.dataset.memdel)));
   $('#addFiles').onclick = () => call('refFiles');
   $('#addUrl').onclick = async () => { const u = $('#refUrl').value.trim(); if (u && await call('refUrl', u)) $('#refUrl').value = ''; };
   document.querySelectorAll('[data-refon]').forEach((c) => (c.onchange = () => call('toggleLesson', c.dataset.refon, null, c.checked)));
@@ -296,9 +305,9 @@ function renderAlert() {
   m.innerHTML = `<div class="dlg"><h3>Process failed</h3><div class="muted" style="margin-bottom:6px">${esc(a.title)}</div><div class="errbox">${esc(a.detail || '')}</div>
     <p>The app already retried this several times. Please open the site in Chrome and check it (a frozen or crashed tab, a logged-out account, a captcha, a full storage or credits limit), fix it, then press <b>Retry</b> to try again.</p>
     <div class="muted tiny" id="aMore">${S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''}</div>
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="btn" id="aRetry" ${S.progress.active ? 'disabled' : ''}>Retry</button></div></div>`;
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="btn" id="aRetry">Retry</button></div></div>`;
   $('#aDis').onclick = () => call('alertDismiss', a.id);
-  $('#aRetry').onclick = () => call('alertRetry', a.id);
+  $('#aRetry').onclick = async () => { const b = $('#aRetry'); b.disabled = true; b.textContent = S.progress.active ? 'Queued…' : 'Retrying…'; await call('alertRetry', a.id); };
 }
 
 // ---------- render loop ----------

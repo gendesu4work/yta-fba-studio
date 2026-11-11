@@ -64,6 +64,9 @@ app.whenReady().then(() => {
     return r.filePaths.length;
   }));
   ipcMain.handle('refUrl', wrap((u) => { if (!/^https:\/\//.test(u)) throw new Error('Paste a full https:// link.'); bg(() => engine.addRef(u, 'url'))(); return true; }));
+  ipcMain.handle('addMemory', wrap((t) => engine.addMemory(t)));
+  ipcMain.handle('toggleMemory', wrap((id, on) => engine.toggleMemory(id, on)));
+  ipcMain.handle('removeMemory', wrap((id) => engine.removeMemory(id)));
   ipcMain.handle('toggleLesson', wrap((r, l, on) => engine.toggleLesson(r, l, on)));
   ipcMain.handle('removeRef', wrap((id) => engine.removeRef(id)));
   ipcMain.handle('musicFiles', wrap(async () => {
