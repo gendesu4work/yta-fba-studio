@@ -114,7 +114,7 @@ function renderCreate() {
   const approved = Object.values(S.posts).filter((p) => p.status === 'script' && p.approved).length;
   const total = Object.values(S.posts).filter((p) => p.status === 'script').length;
   const vids = Math.max(1, s.videoCount || 1);
-  const modeNote = { auto: 'The AI decides which sentences become videos (up to 6 per short).', mixed: `About ${vids * 24} Flow credits per short for ${vids} video${vids > 1 ? 's' : ''} (24 per clip).`, images: 'No video clips, so no video credits.', videos: 'Every sentence is a video clip: about 24 Flow credits per sentence.' }[s.mediaMode] || '';
+  const modeNote = { auto: 'The AI decides which phrases become videos (up to 6 per short).', mixed: `About ${vids * 24} Flow credits per short for ${vids} video${vids > 1 ? 's' : ''} (24 per clip).`, images: 'No video clips, so no video credits.', videos: 'Every phrase is a video clip: about 24 Flow credits per phrase.' }[s.mediaMode] || '';
   $('#view-create').innerHTML = `
   <h1>Create</h1><p class="sub">Pick a niche, get today's ideas, choose up to 5, and let Claude do the rest.</p>
   <div class="card"><div class="row"><div class="grow"><b>AI model</b><div class="muted">Currently using <b style="color:var(--text)">Claude ${s.model === 'opus' ? 'Opus' : 'Sonnet'}</b>. ${s.model === 'opus' ? 'Strongest reasoning and writing; slower and uses more of your Claude usage.' : 'Fast, strong writing and uses fewer tokens.'}</div></div>
@@ -127,10 +127,10 @@ function renderCreate() {
   <button class="btn" id="mkIdeas" ${S.progress.active || left <= 0 ? 'disabled' : ''}>${S.ideas.length ? 'Create new ideas' : 'Create'}</button></div></div>
   ${ideas ? `<div class="row" style="margin:8px 0"><b>${S.selected.length} of ${cap} selected</b></div>${ideas}<button class="btn" id="mkScripts" ${!S.selected.length || S.progress.active ? 'disabled' : ''}>Write scripts for ${S.selected.length || ''} selected</button>` : ''}
   <h2>3 · Scripts &amp; visuals</h2>
-  <div class="card"><div class="row"><div><b>What to generate</b><div class="muted tiny">Every sentence of the voiceover gets its own new scene, so the number of pictures always follows the script. ${modeNote}</div></div>
+  <div class="card"><div class="row"><div><b>What to generate</b><div class="muted tiny">Every phrase of the voiceover (each comma, pause and sentence end, about every 2-3 seconds) gets its own new scene, so the number of pictures always follows the script. ${modeNote}</div></div>
     <div class="seg" id="mode"><button data-m="auto" class="${s.mediaMode === 'auto' ? 'on' : ''}">Automatic</button><button data-m="mixed" class="${s.mediaMode === 'mixed' ? 'on' : ''}">Mixed</button><button data-m="images" class="${s.mediaMode === 'images' ? 'on' : ''}">Pictures only</button><button data-m="videos" class="${s.mediaMode === 'videos' ? 'on' : ''}">Videos only</button></div></div>
-    ${s.mediaMode === 'auto' ? '<div class="muted" style="margin-top:12px">The first shot is always a moving video to hook viewers, and the AI picks video or picture for each following sentence by what keeps it entertaining (up to 6 videos per short to protect your Flow credits; pictures are unlimited).</div>' : ''}
-    ${s.mediaMode === 'mixed' ? `<div class="row" style="margin-top:12px"><label>Videos per short: <b id="vcNum">${vids}</b> <input type="range" id="videoCount" min="1" max="15" value="${vids}"></label><span class="muted tiny grow">The first scene is always a video and the others are spread across the story. Every other sentence is a picture.</span></div>` : ''}
+    ${s.mediaMode === 'auto' ? '<div class="muted" style="margin-top:12px">The first shot is always a moving video to hook viewers, and the AI picks video or picture for each following phrase by what keeps it entertaining (up to 6 videos per short to protect your Flow credits; pictures are unlimited).</div>' : ''}
+    ${s.mediaMode === 'mixed' ? `<div class="row" style="margin-top:12px"><label>Videos per short: <b id="vcNum">${vids}</b> <input type="range" id="videoCount" min="1" max="15" value="${vids}"></label><span class="muted tiny grow">The first scene is always a video and the others are spread across the story. Every other phrase is a picture.</span></div>` : ''}
     ${s.mediaMode === 'images' ? '<div class="muted tiny" style="margin-top:8px">Heads up: videos that open with a generated video clip tend to hold viewers better. Pictures-only uses slow camera moves instead.</div>' : ''}
   </div>
   <div class="card"><div class="row"><div class="grow"><b>Background music</b><div class="muted">Automatic researches each track's vibe, then picks the best match for every video.</div></div>
@@ -171,7 +171,7 @@ const fixNotes = {};
 const retryUI = {}; // slug -> { open, what, videos } (kept across re-renders)
 const retryPanel = (slug, p, busy) => {
   const r = retryUI[slug]; if (!r || !r.open) return '';
-  const n = p.post.scenes.length, cur = p.post.scenes.filter((x) => x.type === 'video').length;
+  const n = Math.max(1, (S.beatCounts && S.beatCounts[slug]) || p.post.scenes.length), cur = p.post.scenes.filter((x) => x.type === 'video').length;
   if (r.videos == null) r.videos = Math.max(1, cur);
   const scheduled = p.upload && Object.values(p.upload).some((u) => u.status === 'scheduled');
   const opt = (k, t, d) => `<label class="retryopt ${r.what === k ? 'on' : ''}"><input type="radio" name="retry-${slug}" data-retrywhat="${slug}|${k}" ${r.what === k ? 'checked' : ''}><div><b>${t}</b><div class="muted tiny">${d}</div></div></label>`;
@@ -179,7 +179,7 @@ const retryPanel = (slug, p, busy) => {
     <div class="retryopts">
       ${opt('script', 'Script', 'Write a new script on the same topic and replace this one. Then a new voiceover and all new pictures and videos are made.')}
       ${opt('voice', 'Voiceover', 'Record the voiceover again from the same script. The pictures and videos are kept.')}
-      ${opt('visuals', 'All scenes', `Make every picture and video again. Pictures follow the sentences automatically (${n} scenes, one per sentence).`)}
+      ${opt('visuals', 'All scenes', `Make every picture and video again, one scene per phrase (${n} scenes${p.post.scenes.length !== n ? `; this video has only ${p.post.scenes.length} now, so the scenes are rebuilt first` : ''}).`)}
     </div>
     ${r.what === 'visuals' ? `<div class="row" style="margin-top:10px"><label>Videos in this short: <b data-retryvn="${slug}">${r.videos}</b> <input type="range" min="1" max="${n}" value="${r.videos}" data-retryvids="${slug}"></label>
       <span class="muted tiny grow" data-retryvinfo="${slug}">${r.videos} video${r.videos > 1 ? 's' : ''} + ${n - r.videos} picture${n - r.videos === 1 ? '' : 's'} · about ${r.videos * 24} Flow credits for the videos. The first scene is always a video.</span></div>` : ''}
