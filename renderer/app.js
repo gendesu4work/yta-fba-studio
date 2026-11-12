@@ -114,7 +114,7 @@ function renderCreate() {
   const approved = Object.values(S.posts).filter((p) => p.status === 'script' && p.approved).length;
   const total = Object.values(S.posts).filter((p) => p.status === 'script').length;
   const vids = Math.max(1, s.videoCount || 1);
-  const modeNote = { auto: 'The AI decides which phrases become videos (up to 6 per short).', mixed: `About ${vids * 24} Flow credits per short for ${vids} video${vids > 1 ? 's' : ''} (24 per clip).`, images: 'No video clips, so no video credits.', videos: 'Every phrase is a video clip: about 24 Flow credits per phrase.' }[s.mediaMode] || '';
+  const modeNote = { auto: 'The AI decides which phrases become videos (up to 6 per short).', mixed: `About ${vids * 3} Flow credits per short for ${vids} video${vids > 1 ? 's' : ''} (3-second Omni 1.2 Flash clips, about 3 credits each).`, images: 'No video clips, so no video credits.', videos: 'Every phrase is a 3-second Omni 1.2 Flash clip: about 3 Flow credits per phrase.' }[s.mediaMode] || '';
   $('#view-create').innerHTML = `
   <h1>Create</h1><p class="sub">Pick a niche, get today's ideas, choose up to 5, and let Claude do the rest.</p>
   <div class="card"><div class="row"><div class="grow"><b>AI model</b><div class="muted">Currently using <b style="color:var(--text)">Claude ${s.model === 'opus' ? 'Opus' : 'Sonnet'}</b>. ${s.model === 'opus' ? 'Strongest reasoning and writing; slower and uses more of your Claude usage.' : 'Fast, strong writing and uses fewer tokens.'}</div></div>
@@ -182,7 +182,7 @@ const retryPanel = (slug, p, busy) => {
       ${opt('visuals', 'All scenes', `Make every picture and video again, one scene per phrase (${n} scenes${p.post.scenes.length !== n ? `; this video has only ${p.post.scenes.length} now, so the scenes are rebuilt first` : ''}).`)}
     </div>
     ${r.what === 'visuals' ? `<div class="row" style="margin-top:10px"><label>Videos in this short: <b data-retryvn="${slug}">${r.videos}</b> <input type="range" min="1" max="${n}" value="${r.videos}" data-retryvids="${slug}"></label>
-      <span class="muted tiny grow" data-retryvinfo="${slug}">${r.videos} video${r.videos > 1 ? 's' : ''} + ${n - r.videos} picture${n - r.videos === 1 ? '' : 's'} · about ${r.videos * 24} Flow credits for the videos. The first scene is always a video.</span></div>` : ''}
+      <span class="muted tiny grow" data-retryvinfo="${slug}">${r.videos} video${r.videos > 1 ? 's' : ''} + ${n - r.videos} picture${n - r.videos === 1 ? '' : 's'} · about ${r.videos * 3} Flow credits for the videos (3-second clips). The first scene is always a video.</span></div>` : ''}
     ${scheduled ? '<div class="muted tiny" style="margin-top:8px">This video is already scheduled. The old scheduled posts are removed and replaced when you accept the new version.</div>' : ''}
     <div class="row" style="margin-top:10px"><button class="btn" data-retrygo="${slug}" ${busy || !r.what ? 'disabled' : ''}>Start retry</button><button class="ghost" data-retryx="${slug}">Cancel</button></div></div>`;
 };
@@ -234,7 +234,7 @@ function renderUpload() {
   document.querySelectorAll('[data-retryvids]').forEach((i) => (i.oninput = () => {
     const k = i.dataset.retryvids, v = +i.value, n = +i.max; retryUI[k].videos = v;
     document.querySelector(`[data-retryvn="${k}"]`).textContent = v;
-    document.querySelector(`[data-retryvinfo="${k}"]`).textContent = `${v} video${v > 1 ? 's' : ''} + ${n - v} picture${n - v === 1 ? '' : 's'} · about ${v * 24} Flow credits for the videos. The first scene is always a video.`;
+    document.querySelector(`[data-retryvinfo="${k}"]`).textContent = `${v} video${v > 1 ? 's' : ''} + ${n - v} picture${n - v === 1 ? '' : 's'} · about ${v * 3} Flow credits for the videos (3-second clips). The first scene is always a video.`;
   }));
   document.querySelectorAll('[data-retrygo]').forEach((b) => (b.onclick = async () => {
     const k = b.dataset.retrygo, r = retryUI[k]; if (!r || !r.what) return;
