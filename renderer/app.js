@@ -168,6 +168,10 @@ function renderCreate() {
 const PL = { youtube: 'YouTube Shorts', tiktok: 'TikTok', facebook: 'Facebook Reels', instagram: 'Instagram Reels' };
 const fmtWhen = (t) => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 const fixNotes = {};
+const contBtn = (slug, busy) => {
+  const f = (S.progressFiles || {})[slug]; if (!f || !f.clips) return '';
+  return `<button class="ghost small" data-cont="${slug}" ${busy || !f.voice ? 'disabled' : ''} title="${f.voice ? 'Finish the video now with the voiceover, script and clips already made. Nothing new is generated.' : 'No voiceover yet: use Retry.'}">Continue (${f.clips}/${f.scenes} scenes)</button>`;
+};
 const retryUI = {}; // slug -> { open, what, videos } (kept across re-renders)
 const retryPanel = (slug, p, busy) => {
   const r = retryUI[slug]; if (!r || !r.open) return '';
@@ -217,7 +221,7 @@ function renderUpload() {
         <div class="muted" style="margin:0 0 8px">${p.customSlot ? 'It will be scheduled for the time you chose.' : 'Leave it empty and it is scheduled for the next US prime-time slot (at a slightly different minute each time, like 12:17 or 7:42 PM ET), and posted to Instagram at that time.'}</div>`}
       </div></div>${retryPanel(slug, p, busy)}${fixBlock}</div>`;
   }).join('');
-  const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span><button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
+  const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span>${contBtn(slug, busy)}<button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
   const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
   $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences across the day (morning to late evening Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
   <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="jitter" ${S.settings.slotJitter !== false ? 'checked' : ''}><span class="tr"></span><b>Vary the minutes</b></label><span class="muted grow">Posts go out at natural-looking times (like 12:17 or 7:42 PM ET) instead of exactly on the hour. Or pick your own time on each video.</span></div></div>
@@ -251,6 +255,7 @@ function renderUpload() {
   document.querySelectorAll('[data-dsfix]').forEach((b) => (b.onclick = () => call('discardFix', b.dataset.dsfix)));
   document.querySelectorAll('[data-retryup]').forEach((b) => (b.onclick = () => { const [s, pl] = b.dataset.retryup.split('|'); call('retryUpload', s, pl); }));
   document.querySelectorAll('[data-retryall]').forEach((b) => (b.onclick = () => call('retryUpload', b.dataset.retryall, null)));
+  document.querySelectorAll('[data-cont]').forEach((b) => (b.onclick = () => { b.disabled = true; call('continueVideo', b.dataset.cont); }));
   document.querySelectorAll('[data-retryprod]').forEach((b) => (b.onclick = () => call('retryProduce', b.dataset.retryprod)));
 }
 
