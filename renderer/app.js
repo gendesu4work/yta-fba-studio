@@ -358,20 +358,26 @@ function renderAlert() {
   const m = $('#modal'); const a = S.alerts && S.alerts[0];
   if (!a) { m.hidden = true; return; }
   const more = S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : '';
-  const advice = (a.diagnosis ? `<b>What went wrong:</b> ${esc(a.diagnosis)}` : '') + (a.advice ? `<div style="margin-top:6px"><b>What to do:</b> ${esc(a.advice)}</div>` : '');
+  const advice = (a.diagnosis ? `<b>What went wrong:</b> ${esc(a.diagnosis)}` : '') + (a.fixDesc ? `<div style="margin-top:6px"><b>The fix:</b> ${esc(a.fixDesc)}</div>` : '') + (a.advice ? `<div style="margin-top:6px"><b>What to do:</b> ${esc(a.advice)}</div>` : '') + (a.fix ? `<div style="margin-top:6px">Press <b>Continue</b> to ${a.fix.action === 'user-action' ? 'retry' : 'apply this fix and retry'}.</div>` : '');
+  const fixLabel = a.fixing ? 'Looking for a fix…' : a.fix ? 'Continue' : 'Find a fix';
   if (m.dataset.id === a.id && !m.hidden) {
     $('#aMore').textContent = more; $('#aAdvice').innerHTML = advice; $('#aAdvice').hidden = !advice;
-    const fb = $('#aFix'); if (fb && !fb.dataset.clicked) { fb.disabled = !!a.fixing; fb.textContent = a.fixing ? 'Looking for a fix…' : 'Find a fix'; }
+    const fb = $('#aFix'); if (fb && !fb.dataset.clicked) { fb.disabled = !!a.fixing; fb.textContent = fixLabel; }
     return;
   }
   m.dataset.id = a.id; m.hidden = false;
   m.innerHTML = `<div class="dlg"><h3>Process failed</h3><div class="muted" style="margin-bottom:6px">${esc(a.title)}</div><div class="errbox">${esc(a.detail || '')}</div>
     <div class="errbox" id="aAdvice" style="background:rgba(22,163,74,.12);color:inherit" ${advice ? '' : 'hidden'}>${advice}</div>
-    <p>Press <b>Find a fix</b> and the app works out the cause, fixes it where it can, and retries by itself. If it needs something from you (a sign-in, Chrome, credits), it tells you exactly what. <b>Retry</b> tries again unchanged.</p>
+    <p>Press <b>Find a fix</b> and the app works out the cause and shows the fix. Press <b>Continue</b> to apply it and retry. If it needs something from you (a sign-in, Chrome, credits), it tells you exactly what. <b>Retry</b> tries again unchanged.</p>
     <div class="muted tiny" id="aMore">${S.alerts.length > 1 ? `+${S.alerts.length - 1} more problem${S.alerts.length > 2 ? 's' : ''} after this one` : ''}</div>
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="ghost" id="aRetry">Retry</button><button class="btn" id="aFix">Find a fix</button></div></div>`;
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="aDis">Dismiss</button><button class="ghost" id="aRetry">Retry</button><button class="btn" id="aFix" ${a.fixing ? 'disabled' : ''}>${fixLabel}</button></div></div>`;
   $('#aDis').onclick = () => call('alertDismiss', a.id);
-  $('#aFix').onclick = async () => { const b = $('#aFix'); b.dataset.clicked = '1'; b.disabled = true; b.textContent = 'Looking for a fix…'; await call('alertFix', a.id); delete b.dataset.clicked; };
+  $('#aFix').onclick = async () => {
+    const b = $('#aFix'), cur = (S.alerts || []).find((x) => x.id === a.id); b.dataset.clicked = '1'; b.disabled = true;
+    if (cur && cur.fix) { b.textContent = S.progress.active ? 'Queued…' : 'Applying…'; await call('alertApply', a.id); }
+    else { b.textContent = 'Looking for a fix…'; await call('alertFix', a.id); }
+    delete b.dataset.clicked; renderAlert();
+  };
   $('#aRetry').onclick = async () => { const b = $('#aRetry'); b.disabled = true; b.textContent = S.progress.active ? 'Queued…' : 'Retrying…'; await call('alertRetry', a.id); };
 }
 

@@ -88,6 +88,7 @@ app.whenReady().then(() => {
   ipcMain.handle('retryProduce', wrap((s) => engine.retryProduce(s)));
   ipcMain.handle('alertFix', wrap(bg((id) => engine.fixAlert(id))));
   ipcMain.handle('alertRetry', wrap((id) => engine.retryAlert(id)));
+  ipcMain.handle('alertApply', wrap((id) => engine.applyFix(id)));
   ipcMain.handle('alertDismiss', wrap((id) => engine.dismissAlert(id)));
   ipcMain.handle('dataInfo', wrap(() => engine.dataInfo()));
   ipcMain.handle('backupNow', wrap(() => engine.backup('manual')));
