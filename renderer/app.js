@@ -113,7 +113,8 @@ function renderCreate() {
     <div class="row" style="margin-top:10px"><button class="ghost small" data-act="approve">${p.approved ? 'Un-approve' : 'Approve script'}</button><button class="danger small" data-act="discard">Discard</button></div></div>`).join('');
   const approved = Object.values(S.posts).filter((p) => p.status === 'script' && p.approved).length;
   const total = Object.values(S.posts).filter((p) => p.status === 'script').length;
-  const vids = s.mediaMode === 'videos' ? s.sceneCount : s.mediaMode === 'images' ? 0 : Math.max(1, s.videoCount);
+  const vids = Math.max(1, s.videoCount || 1);
+  const modeNote = { auto: 'The AI decides which sentences become videos (up to 6 per short).', mixed: `About ${vids * 24} Flow credits per short for ${vids} video${vids > 1 ? 's' : ''} (24 per clip).`, images: 'No video clips, so no video credits.', videos: 'Every sentence is a video clip: about 24 Flow credits per sentence.' }[s.mediaMode] || '';
   $('#view-create').innerHTML = `
   <h1>Create</h1><p class="sub">Pick a niche, get today's ideas, choose up to 5, and let Claude do the rest.</p>
   <div class="card"><div class="row"><div class="grow"><b>AI model</b><div class="muted">Currently using <b style="color:var(--text)">Claude ${s.model === 'opus' ? 'Opus' : 'Sonnet'}</b>. ${s.model === 'opus' ? 'Strongest reasoning and writing; slower and uses more of your Claude usage.' : 'Fast, strong writing and uses fewer tokens.'}</div></div>
@@ -126,11 +127,10 @@ function renderCreate() {
   <button class="btn" id="mkIdeas" ${S.progress.active || left <= 0 ? 'disabled' : ''}>${S.ideas.length ? 'Create new ideas' : 'Create'}</button></div></div>
   ${ideas ? `<div class="row" style="margin:8px 0"><b>${S.selected.length} of ${cap} selected</b></div>${ideas}<button class="btn" id="mkScripts" ${!S.selected.length || S.progress.active ? 'disabled' : ''}>Write scripts for ${S.selected.length || ''} selected</button>` : ''}
   <h2>3 · Scripts &amp; visuals</h2>
-  <div class="card"><div class="row"><div><b>What to generate</b><div class="muted tiny">${s.mediaMode === 'auto' ? 'The AI decides how many pictures and videos each short needs.' : `Flow video clips cost more credits than pictures. About ${vids * 24} Flow credits per video (24 per clip).`}</div></div>
+  <div class="card"><div class="row"><div><b>What to generate</b><div class="muted tiny">Every sentence of the voiceover gets its own new scene, so the number of pictures always follows the script. ${modeNote}</div></div>
     <div class="seg" id="mode"><button data-m="auto" class="${s.mediaMode === 'auto' ? 'on' : ''}">Automatic</button><button data-m="mixed" class="${s.mediaMode === 'mixed' ? 'on' : ''}">Mixed</button><button data-m="images" class="${s.mediaMode === 'images' ? 'on' : ''}">Pictures only</button><button data-m="videos" class="${s.mediaMode === 'videos' ? 'on' : ''}">Videos only</button></div></div>
-    ${s.mediaMode === 'auto' ? '<div class="muted" style="margin-top:12px">Every sentence of the voiceover gets its own new picture or video. The first shot is always a moving video to hook viewers, and the AI picks video or picture for each following sentence by what keeps it entertaining (capped at 6 videos and 14 scenes per short to protect your credits).</div>' : ''}
-    <div class="row" style="margin-top:12px">${s.mediaMode !== 'auto' ? `<label>Scenes per video: <b>${s.sceneCount}</b> <input type="range" id="sceneCount" min="4" max="10" value="${s.sceneCount}"></label>` : ''}
-    ${s.mediaMode === 'mixed' ? `<label>Video clips per video: <b>${Math.max(1, s.videoCount)}</b> <input type="range" id="videoCount" min="1" max="${s.sceneCount}" value="${Math.max(1, s.videoCount)}"></label>` : ''}</div>
+    ${s.mediaMode === 'auto' ? '<div class="muted" style="margin-top:12px">The first shot is always a moving video to hook viewers, and the AI picks video or picture for each following sentence by what keeps it entertaining (up to 6 videos per short to protect your Flow credits; pictures are unlimited).</div>' : ''}
+    ${s.mediaMode === 'mixed' ? `<div class="row" style="margin-top:12px"><label>Videos per short: <b id="vcNum">${vids}</b> <input type="range" id="videoCount" min="1" max="15" value="${vids}"></label><span class="muted tiny grow">The first scene is always a video and the others are spread across the story. Every other sentence is a picture.</span></div>` : ''}
     ${s.mediaMode === 'images' ? '<div class="muted tiny" style="margin-top:8px">Heads up: videos that open with a generated video clip tend to hold viewers better. Pictures-only uses slow camera moves instead.</div>' : ''}
   </div>
   <div class="card"><div class="row"><div class="grow"><b>Background music</b><div class="muted">Automatic researches each track's vibe, then picks the best match for every video.</div></div>
@@ -152,8 +152,7 @@ function renderCreate() {
   }));
   const mk = $('#mkScripts'); if (mk) mk.onclick = () => call('scripts');
   document.querySelectorAll('#mode button').forEach((b) => (b.onclick = () => call('settings', { mediaMode: b.dataset.m })));
-  const scn = $('#sceneCount'); if (scn) scn.onchange = (e) => call('settings', { sceneCount: +e.target.value });
-  const vc = $('#videoCount'); if (vc) vc.onchange = (e) => call('settings', { videoCount: +e.target.value });
+  const vc = $('#videoCount'); if (vc) { vc.oninput = (e) => { $('#vcNum').textContent = e.target.value; }; vc.onchange = (e) => call('settings', { videoCount: +e.target.value }); }
   $('#auto').onchange = (e) => call('settings', { autoApprove: e.target.checked });
   document.querySelectorAll('[data-slug]').forEach((c) => {
     const slug = c.dataset.slug;
@@ -169,6 +168,24 @@ function renderCreate() {
 const PL = { youtube: 'YouTube Shorts', tiktok: 'TikTok', facebook: 'Facebook Reels', instagram: 'Instagram Reels' };
 const fmtWhen = (t) => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 const fixNotes = {};
+const retryUI = {}; // slug -> { open, what, videos } (kept across re-renders)
+const retryPanel = (slug, p, busy) => {
+  const r = retryUI[slug]; if (!r || !r.open) return '';
+  const n = p.post.scenes.length, cur = p.post.scenes.filter((x) => x.type === 'video').length;
+  if (r.videos == null) r.videos = Math.max(1, cur);
+  const scheduled = p.upload && Object.values(p.upload).some((u) => u.status === 'scheduled');
+  const opt = (k, t, d) => `<label class="retryopt ${r.what === k ? 'on' : ''}"><input type="radio" name="retry-${slug}" data-retrywhat="${slug}|${k}" ${r.what === k ? 'checked' : ''}><div><b>${t}</b><div class="muted tiny">${d}</div></div></label>`;
+  return `<div class="fixbox"><b>What do you want to retry?</b>
+    <div class="retryopts">
+      ${opt('script', 'Script', 'Write a new script on the same topic and replace this one. Then a new voiceover and all new pictures and videos are made.')}
+      ${opt('voice', 'Voiceover', 'Record the voiceover again from the same script. The pictures and videos are kept.')}
+      ${opt('visuals', 'All scenes', `Make every picture and video again. Pictures follow the sentences automatically (${n} scenes, one per sentence).`)}
+    </div>
+    ${r.what === 'visuals' ? `<div class="row" style="margin-top:10px"><label>Videos in this short: <b data-retryvn="${slug}">${r.videos}</b> <input type="range" min="1" max="${n}" value="${r.videos}" data-retryvids="${slug}"></label>
+      <span class="muted tiny grow" data-retryvinfo="${slug}">${r.videos} video${r.videos > 1 ? 's' : ''} + ${n - r.videos} picture${n - r.videos === 1 ? '' : 's'} · about ${r.videos * 24} Flow credits for the videos. The first scene is always a video.</span></div>` : ''}
+    ${scheduled ? '<div class="muted tiny" style="margin-top:8px">This video is already scheduled. The old scheduled posts are removed and replaced when you accept the new version.</div>' : ''}
+    <div class="row" style="margin-top:10px"><button class="btn" data-retrygo="${slug}" ${busy || !r.what ? 'disabled' : ''}>Start retry</button><button class="ghost" data-retryx="${slug}">Cancel</button></div></div>`;
+};
 const toLocalInput = (t) => { if (!t) return ''; const d = new Date(t), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 const reportHtml = (r) => !r ? '' : r.ok
   ? `<div class="rep ok">Checked: no problems found. Audio ${r.info.audioSeconds}s of ${r.info.voiceSeconds}s voice, captions in sync.</div>`
@@ -192,13 +209,13 @@ function renderUpload() {
     const anyRetry = p.accepted && Object.entries(p.upload || {}).some(([pl, u]) => pl !== 'instagram' && ['failed', 'queued', 'stopped'].includes(u.status));
     return `<div class="card"><div class="row" style="align-items:flex-start;gap:16px"><video controls preload="metadata" src="${fileUrl(p.files.final)}"></video>
       <div class="grow"><b>${esc(p.post.title)}</b><div class="muted">${Math.round(p.files.seconds)}s · ${esc(p.post.short_caption)}</div>${p.music ? `<div class="muted tiny">Music: ${p.music.file ? esc(p.music.file.replace(/\.[^.]+$/, '')) : 'none'} · ${esc(p.music.reason || '')}</div>` : ''}
-      <div class="row" style="margin:10px 0 4px"><button class="ghost" data-review="${slug}" ${busy ? 'disabled' : ''}>Review</button><input type="text" class="fixnote" data-fixnote="${slug}" value="${esc(fixNotes[slug] || '')}" placeholder="What needs fixing? e.g. visuals change too early" style="flex:1;min-width:200px"><button class="ghost" data-fix="${slug}" ${busy || (fx && fx.status === 'working') ? 'disabled' : ''}>Fix</button>
+      <div class="row" style="margin:10px 0 4px"><button class="ghost" data-retryopen="${slug}" ${busy ? 'disabled' : ''}>Retry</button><input type="text" class="fixnote" data-fixnote="${slug}" value="${esc(fixNotes[slug] || '')}" placeholder="What needs fixing? e.g. visuals change too early" style="flex:1;min-width:200px"><button class="ghost" data-fix="${slug}" ${busy || (fx && fx.status === 'working') ? 'disabled' : ''}>Fix</button>
         ${p.accepted ? '' : `<button class="btn" data-acc="${slug}" ${busy ? 'disabled' : ''}>Accept &amp; schedule</button><button class="danger" data-rej="${slug}">Reject</button>`}</div>
       ${reportHtml(p.review)}
       ${p.accepted ? `<div style="margin:10px 0 6px"><b>Posting time:</b> ${fmtWhen(p.slot)} <span class="muted">(US prime time, checked against the clock before each upload)</span></div>${plat}${anyRetry ? `<div style="margin-top:8px"><button class="btn small" data-retryall="${slug}" ${busy ? 'disabled' : ''}>Retry all unfinished uploads</button></div>` : ''}`
         : `<div class="row" style="margin:8px 0"><label class="muted">Post at (optional, your local time):</label><input type="datetime-local" data-slotin="${slug}" value="${toLocalInput(p.customSlot)}" style="width:210px"><button class="ghost small" data-slotclr="${slug}" ${p.customSlot ? '' : 'hidden'}>Use automatic time</button></div>
         <div class="muted" style="margin:0 0 8px">${p.customSlot ? 'It will be scheduled for the time you chose.' : 'Leave it empty and it is scheduled for the next US prime-time slot (at a slightly different minute each time, like 12:17 or 7:42 PM ET), and posted to Instagram at that time.'}</div>`}
-      </div></div>${fixBlock}</div>`;
+      </div></div>${retryPanel(slug, p, busy)}${fixBlock}</div>`;
   }).join('');
   const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span><button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
   const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
@@ -211,7 +228,19 @@ function renderUpload() {
   document.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => call('accept', b.dataset.acc)));
   document.querySelectorAll('[data-rej]').forEach((b) => (b.onclick = () => call('reject', b.dataset.rej)));
   document.querySelectorAll('[data-retry]').forEach((b) => (b.onclick = () => call('retryJob', b.dataset.retry)));
-  document.querySelectorAll('[data-review]').forEach((b) => (b.onclick = async () => { b.disabled = true; b.textContent = 'Checking…'; await call('review', b.dataset.review); }));
+  document.querySelectorAll('[data-retryopen]').forEach((b) => (b.onclick = () => { const k = b.dataset.retryopen; retryUI[k] = retryUI[k] && retryUI[k].open ? { open: false } : { open: true, what: null }; renderUpload(); }));
+  document.querySelectorAll('[data-retryx]').forEach((b) => (b.onclick = () => { retryUI[b.dataset.retryx] = { open: false }; renderUpload(); }));
+  document.querySelectorAll('[data-retrywhat]').forEach((i) => (i.onchange = () => { const [k, w] = i.dataset.retrywhat.split('|'); retryUI[k].what = w; renderUpload(); }));
+  document.querySelectorAll('[data-retryvids]').forEach((i) => (i.oninput = () => {
+    const k = i.dataset.retryvids, v = +i.value, n = +i.max; retryUI[k].videos = v;
+    document.querySelector(`[data-retryvn="${k}"]`).textContent = v;
+    document.querySelector(`[data-retryvinfo="${k}"]`).textContent = `${v} video${v > 1 ? 's' : ''} + ${n - v} picture${n - v === 1 ? '' : 's'} · about ${v * 24} Flow credits for the videos. The first scene is always a video.`;
+  }));
+  document.querySelectorAll('[data-retrygo]').forEach((b) => (b.onclick = async () => {
+    const k = b.dataset.retrygo, r = retryUI[k]; if (!r || !r.what) return;
+    b.disabled = true; retryUI[k] = { open: false };
+    await call('redo', k, r.what, r.videos);
+  }));
   document.querySelectorAll('[data-fixnote]').forEach((i) => { i.oninput = () => { fixNotes[i.dataset.fixnote] = i.value; }; i.onkeydown = (e) => { if (e.key === 'Enter') { const b = document.querySelector(`[data-fix="${i.dataset.fixnote}"]`); if (b && !b.disabled) b.click(); } }; });
   document.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => { const n = fixNotes[b.dataset.fix] || ''; delete fixNotes[b.dataset.fix]; call('fix', b.dataset.fix, n); }));
   document.querySelectorAll('[data-slotin]').forEach((i) => (i.onchange = () => call('customSlot', i.dataset.slotin, i.value ? new Date(i.value).getTime() : null)));

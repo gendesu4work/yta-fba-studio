@@ -83,6 +83,7 @@ app.whenReady().then(() => {
   ipcMain.handle('approveFix', wrap((s) => engine.approveFix(s)));
   ipcMain.handle('discardFix', wrap((s) => engine.discardFix(s)));
   ipcMain.handle('retryUpload', wrap((s, p) => engine.retryUpload(s, p)));
+  ipcMain.handle('redo', wrap((s, w, n) => { engine.redo(s, w, n); return true; }));
   ipcMain.handle('retryProduce', wrap((s) => engine.retryProduce(s)));
   ipcMain.handle('alertFix', wrap(bg((id) => engine.fixAlert(id))));
   ipcMain.handle('alertRetry', wrap((id) => engine.retryAlert(id)));
