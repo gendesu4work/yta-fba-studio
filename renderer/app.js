@@ -259,6 +259,215 @@ function renderUpload() {
   document.querySelectorAll('[data-retryprod]').forEach((b) => (b.onclick = () => call('retryProduce', b.dataset.retryprod)));
 }
 
+// ---------- poster (Facebook / Instagram picture posts) ----------
+const PFONTS = [['Rounded', 'Rounded bold'], ['Impact', 'Impact'], ['Arial Black', 'Arial Black'], ['Bahnschrift', 'Bahnschrift'], ['Segoe UI', 'Segoe UI Bold'], ['Georgia', 'Georgia Bold']];
+const PW = 1080, PH = 1080; // always square 1:1 with one hook caption (user's standing rule)
+const pImgs = {}; // "id|file" -> Image (or 'loading')
+const pNotes = {};
+function posterImg(id, file) {
+  const k = id + '|' + file, v = pImgs[k];
+  if (v && v !== 'loading') return v;
+  if (!v) {
+    pImgs[k] = 'loading';
+    window.api.posterImage(id, file).then((r) => {
+      if (!r.ok) { delete pImgs[k]; return; }
+      const im = new Image(); im.onload = () => { pImgs[k] = im; drawPosters(); }; im.src = r.data;
+    });
+  }
+  return null;
+}
+// "*word*" marks accent-coloured words
+function pTokens(text) {
+  const out = [];
+  String(text).split(/(\*[^*]+\*)/).forEach((part) => {
+    const hi = /^\*[^*]+\*$/.test(part);
+    (hi ? part.slice(1, -1) : part).split(/\s+/).filter(Boolean).forEach((w) => out.push({ w, hi }));
+  });
+  return out;
+}
+function pWrap(x, toks, maxW) {
+  const sp = x.measureText(' ').width, lines = []; let cur = [], w = 0;
+  for (const t of toks) {
+    t.width = x.measureText(t.w).width;
+    const add = (cur.length ? sp : 0) + t.width;
+    if (cur.length && w + add > maxW) { lines.push({ toks: cur, w }); cur = [t]; w = t.width; } else { cur.push(t); w += add; }
+  }
+  if (cur.length) lines.push({ toks: cur, w });
+  return lines;
+}
+function drawPoster(cv, img, t) {
+  const x = cv.getContext('2d'), W = cv.width, H = cv.height, k = W / PW;
+  x.clearRect(0, 0, W, H); x.fillStyle = '#1b1f27'; x.fillRect(0, 0, W, H);
+  if (img) { const s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s; x.drawImage(img, (W - w) / 2, (H - h) / 2, w, h); }
+  // always: darken the picture and add a vignette, so the hook caption in front pops (user's standing rule)
+  const dk = t && t.dark != null ? t.dark : 0.75;
+  x.fillStyle = `rgba(0,0,0,${(0.12 + 0.38 * dk).toFixed(3)})`; x.fillRect(0, 0, W, H);
+  const vg = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.28, W / 2, H / 2, Math.hypot(W, H) / 2);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,0,0,${(0.45 + 0.5 * dk).toFixed(3)})`);
+  x.fillStyle = vg; x.fillRect(0, 0, W, H);
+  if (!t) return;
+  const fam = t.font || 'Rounded', weight = fam === 'Impact' ? '400' : '800', maxW = W * 0.84;
+  const famCss = (fam === 'Rounded' ? '"Arial Rounded MT Bold", "Segoe UI Black"' : `"${fam}"`) + ', "Segoe UI Emoji", sans-serif';
+  let scale = (t.size || 1);
+  const build = () => [t.headline].map((txt, i) => {
+    if (!txt) return null;
+    const px = Math.round(W * 0.075 * scale), font = `${weight} ${px}px ${famCss}`;
+    x.font = font;
+    return { px, font, lh: px * 1.14, lines: pWrap(x, pTokens(t.upper ? txt.toUpperCase() : txt), maxW) };
+  }).filter(Boolean);
+  let blocks = build();
+  const hOf = (g) => g.reduce((a, b, i) => a + b.lines.length * b.lh + (i ? b.px * 0.45 : 0), 0);
+  for (let n = 0; n < 8 && hOf(blocks) > H * 0.42; n++) { scale *= 0.9; blocks = build(); }
+  const foot = t.footer ? Math.round(W * 0.026) : 0, padY = H * 0.055, bottomEdge = H - padY - (foot ? foot * 1.8 : 0);
+  const groups = [{ g: blocks, pos: ['top', 'center', 'bottom'].includes(t.position) ? t.position : 'top' }];
+  for (const G of groups) {
+    const gh = hOf(G.g);
+    G.y = G.pos === 'top' ? padY : G.pos === 'bottom' ? bottomEdge - gh : (H - gh) / 2;
+    G.h = gh;
+    if (t.band === 'shade') {
+      if (G.pos === 'center') { x.fillStyle = 'rgba(0,0,0,.38)'; x.fillRect(0, 0, W, H); }
+      else {
+        const top = G.pos === 'top', y0 = top ? 0 : G.y - H * 0.1, y1 = top ? G.y + gh + H * 0.1 : H;
+        const gr = x.createLinearGradient(0, y0, 0, y1);
+        gr.addColorStop(top ? 0 : 1, 'rgba(0,0,0,.78)'); gr.addColorStop(top ? 1 : 0, 'rgba(0,0,0,0)');
+        x.fillStyle = gr; x.fillRect(0, y0, W, y1 - y0);
+      }
+    } else if (t.band === 'box') {
+      const bw = Math.max(...G.g.flatMap((b) => b.lines.map((l) => l.w))) + W * 0.07, bx = (W - bw) / 2, by = G.y - H * 0.022, bh = gh + H * 0.044, r = 18 * k;
+      x.fillStyle = 'rgba(0,0,0,.62)'; x.beginPath(); x.roundRect(bx, by, bw, bh, r); x.fill();
+    }
+  }
+  x.textBaseline = 'top'; x.lineJoin = 'round';
+  for (const G of groups) {
+    let y = G.y;
+    G.g.forEach((b, i) => {
+      if (i) y += b.px * 0.45;
+      x.font = b.font; const sp = x.measureText(' ').width;
+      for (const ln of b.lines) {
+        let cx = (W - ln.w) / 2;
+        for (const tk of ln.toks) {
+          if (t.stroke) { x.lineWidth = Math.max(2, b.px * 0.14); x.strokeStyle = '#000'; x.strokeText(tk.w, cx, y + (b.lh - b.px) / 2); }
+          else { x.shadowColor = 'rgba(0,0,0,.55)'; x.shadowBlur = b.px * 0.18; x.shadowOffsetY = b.px * 0.04; }
+          x.fillStyle = tk.hi ? (t.accent || '#ffd400') : (t.color || '#fff');
+          x.fillText(tk.w, cx, y + (b.lh - b.px) / 2);
+          x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+          cx += tk.width + sp;
+        }
+        y += b.lh;
+      }
+    });
+  }
+  if (foot) { x.font = `600 ${foot}px "Segoe UI"`; x.fillStyle = 'rgba(255,255,255,.85)'; x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = foot * 0.4; const fw = x.measureText(t.footer).width; x.fillText(t.footer, (W - fw) / 2, H - padY * 0.55 - foot); x.shadowColor = 'transparent'; x.shadowBlur = 0; }
+}
+function drawPosters() {
+  if (!S || !S.poster) return;
+  document.querySelectorAll('canvas[data-pcv]').forEach((cv) => { const it = S.poster.items[cv.dataset.pcv]; if (it && it.variant) drawPoster(cv, posterImg(it.id, it.variant), it.text); });
+  document.querySelectorAll('canvas[data-pth]').forEach((cv) => { const [id, f] = cv.dataset.pth.split('|'); drawPoster(cv, posterImg(id, f), null); });
+}
+const PST = { queued: ['Waiting', 'waiting'], generating: ['Making the picture', 'running'], editing: ['Ready to edit', ''], failed: ['Picture failed', 'failed'], publishing: ['Posting…', 'running'], scheduled: ['Scheduled', 'scheduled'], posted: ['Posted', 'posted'], attention: ['Needs attention', 'failed'] };
+function renderPoster() {
+  const P0 = S.poster, busy = S.progress.active, slot = S.posterSlot;
+  const niches = S.posterNiches.map((n) => `<button class="niche ${P0.niche === n.id ? 'sel' : ''}" data-pniche="${n.id}"><b>${esc(n.name)}</b><span>${esc(n.blurb)}</span></button>`).join('');
+  const ideas = P0.ideas.map((i) => `<div class="idea ${P0.pick === i.id ? 'sel' : ''}" data-pidea="${i.id}"><div class="ck pradio">${P0.pick === i.id ? '✓' : ''}</div><div class="grow">
+      <b>${esc(i.text.headline.replace(/\*/g, ''))}</b>${i.angle ? `<span class="tag">${esc(i.angle)}</span>` : ''}${i.realistic ? '<span class="tag">realistic photo · AI label on</span>' : ''}
+      <div class="muted tiny">Picture: ${esc(i.imagePrompt)}</div>
+      <div class="muted tiny">Caption: ${esc(i.caption)}</div>
+      ${i.source ? `<div class="muted tiny">Source: ${esc(i.source)}</div>` : ''}${i.why ? `<div class="muted tiny">Why it works: ${esc(i.why)}</div>` : ''}</div></div>`).join('');
+  const items = Object.values(P0.items).sort((a, b) => b.created - a.created);
+  const cards = items.map((it) => {
+    const [stLabel, stCls] = PST[it.status] || [it.status, ''];
+    const t = it.text, locked = !!it.upload && it.status !== 'editing';
+    const head = `<div class="row"><b class="grow">${esc(t.headline.replace(/\*/g, '') || it.title)}</b><span class="muted tiny" style="margin:0">${esc(it.niche)}</span><span class="badge ${stCls}">${stLabel}</span><button class="ghost small" data-pfold="${it.id}">Folder</button>${locked && Object.values(it.upload).some((u) => u.status === 'scheduled') ? '' : `<button class="danger small" data-pdel="${it.id}" ${it.status === 'publishing' || it.status === 'generating' ? 'disabled' : ''}>Remove</button>`}</div>`;
+    if (!it.variants.length) {
+      return `<div class="card">${head}${it.status === 'generating' || it.status === 'queued' ? '<div class="rep wait">Claude is making the picture in Google Flow (Chrome). You can watch the progress at the bottom.</div>' : `<div class="rep bad">${esc(it.error || 'No picture yet.')}</div><button class="btn small" data-pregen="${it.id}" ${busy ? 'disabled' : ''}>Try again</button>`}</div>`;
+    }
+    const thumbs = it.variants.length > 1 ? `<div class="pvars">${it.variants.map((f) => `<canvas width="108" height="108" class="${f === it.variant ? 'on' : ''}" data-pth="${it.id}|${f}" data-pvar="${it.id}|${f}" title="Use this picture"></canvas>`).join('')}</div>` : '';
+    const seg = (key, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-pseg="${it.id}|${key}|${v}" class="${String(cur) === String(v) ? 'on' : ''}" ${locked ? 'disabled' : ''}>${l}</button>`).join('')}</div>`;
+    const up = it.upload ? Object.entries(it.upload).map(([pl, u]) => `<div class="plat"><span class="badge ${u.status}">${u.status}</span><b>${pl === 'facebook' ? 'Facebook Page' : 'Instagram'}</b>${u.when ? `<span class="muted">${fmtWhen(u.when)}</span>` : ''}<span class="muted grow" style="min-width:0">${esc((u.detail || '').slice(0, 140))}</span>${['failed', 'stopped'].includes(u.status) ? `<button class="ghost small" data-pretry="${it.id}|${pl}" ${busy ? 'disabled' : ''}>Retry</button>` : ''}</div>`).join('') : '';
+    const pj = (P0.jobs || []).filter((j) => j.item === it.id && j.kind === 'comment').map((j) => `<div class="plat"><span class="badge ${j.status === 'done' ? 'posted' : j.status}">${j.status === 'done' ? 'commented' : j.status}</span><span class="muted">${j.platform === 'facebook' ? 'Facebook' : 'Instagram'} comment · ${new Date(j.runAt).toLocaleString()}</span>${j.status === 'failed' ? `<button class="ghost small" data-pjob="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button>` : ''}</div>`).join('');
+    const pub = locked ? `<div class="fixbox"><b>${it.mode === 'now' ? 'Posted now' : `Scheduled for ${it.slot ? fmtWhen(it.slot) : '…'}`}</b>${it.slot ? `<span class="muted"> · US prime time</span>` : ''}${up}${pj}</div>`
+      : `<div class="fixbox"><b>Approve &amp; post</b>
+        <div class="row" style="margin-top:8px"><label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|facebook" ${it.platforms.facebook ? 'checked' : ''}><span>Facebook Page <span class="muted">(${esc(S.settings.fbPage || 'set the Page name in Setup')})</span></span></label>
+          <label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|instagram" ${it.platforms.instagram ? 'checked' : ''}><span>Also post the same picture on Instagram</span></label></div>
+        <div class="row" style="margin-top:10px">${seg('mode', it.mode, [['now', 'Post now'], ['schedule', 'Schedule for best US time']])}
+          <span class="muted grow">${it.mode === 'now' ? 'Goes live as soon as you approve.' : slot ? `Next US prime-time slot: <b style="color:var(--text)">${esc(slot.local)}</b> (${esc(slot.et)}).${it.platforms.instagram ? ' Facebook schedules it natively; Instagram is posted by the app at that time (keep the app and Chrome open).' : ''}` : ''}</span></div>
+        <div class="muted tiny">After it goes live, the app adds your engagement question as a comment from the same account.</div>
+        <div class="row" style="margin-top:10px"><button class="btn" data-ppub="${it.id}" ${busy || it.status === 'generating' ? 'disabled' : ''}>${it.mode === 'now' ? 'Approve &amp; post now' : 'Approve &amp; schedule'}</button></div></div>`;
+    return `<div class="card">${head}
+      <div class="pedit"><div class="pleft"><canvas width="${PW}" height="${PH}" data-pcv="${it.id}" class="pcanvas"></canvas>${thumbs}
+        ${locked ? '' : `<button class="ghost small" data-pregen="${it.id}" ${busy ? 'disabled' : ''} style="margin-top:8px;width:100%">${it.status === 'generating' ? 'Making new pictures…' : 'Make new pictures in Flow'}</button>`}</div>
+      <div class="pright">
+        <label class="f">Hook caption on the picture <span class="muted">(wrap words in *stars* for the accent colour)</span></label><input type="text" data-pt="${it.id}|headline" value="${esc(t.headline)}" ${locked ? 'disabled' : ''}>
+        <div class="pgrid">
+          <div><label class="f">Text position</label>${seg('position', t.position, [['top', 'Top'], ['center', 'Center'], ['bottom', 'Bottom']])}</div>
+          <div><label class="f">Background behind text</label>${seg('band', t.band, [['none', 'None'], ['shade', 'Shade'], ['box', 'Box']])}</div>
+          <div><label class="f">Font</label><select data-pt="${it.id}|font" ${locked ? 'disabled' : ''}>${PFONTS.map(([v, l]) => `<option value="${v}" ${t.font === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div><label class="f">Dark &amp; vignette</label><input type="range" min="0" max="1" step="0.05" value="${t.dark != null ? t.dark : 0.75}" data-pt="${it.id}|dark" ${locked ? 'disabled' : ''} style="width:100%"></div>
+          <div><label class="f">Text size</label><input type="range" min="0.5" max="1.6" step="0.05" value="${t.size}" data-pt="${it.id}|size" ${locked ? 'disabled' : ''} style="width:100%"></div>
+          <div><label class="f">Colours (text · accent)</label><div class="row" style="gap:8px"><input type="color" data-pt="${it.id}|color" value="${esc(t.color)}" ${locked ? 'disabled' : ''}><input type="color" data-pt="${it.id}|accent" value="${esc(t.accent)}" ${locked ? 'disabled' : ''}></div></div>
+          <div><label class="f">Style</label><div class="row" style="gap:16px"><label class="switch"><input type="checkbox" data-pck="${it.id}|stroke" ${t.stroke ? 'checked' : ''} ${locked ? 'disabled' : ''}><span class="tr"></span>Outline</label><label class="switch"><input type="checkbox" data-pck="${it.id}|upper" ${t.upper ? 'checked' : ''} ${locked ? 'disabled' : ''}><span class="tr"></span>ALL CAPS</label></div></div>
+        </div>
+        ${locked ? '' : `<label class="f">Ask Claude to change the text</label><div class="row"><input type="text" class="grow" data-pnote="${it.id}" value="${esc(pNotes[it.id] || '')}" placeholder="e.g. make it funnier, shorter, more urgent, move it to the bottom"><button class="ghost" data-prev="${it.id}" ${busy ? 'disabled' : ''}>Edit with Claude</button></div>`}
+        <label class="f">Caption (short line + a few hashtags)</label><input type="text" data-pc="${it.id}|caption" value="${esc(it.caption)}" ${locked ? 'disabled' : ''}>
+        <label class="f">Engagement comment (posted from the same account after it goes live)</label><input type="text" data-pc="${it.id}|comment" value="${esc(it.comment)}" ${locked ? 'disabled' : ''}>
+        ${it.idea.source ? `<div class="muted tiny">Source: ${esc(it.idea.source)}</div>` : ''}
+        <div class="row" style="margin-top:12px"><label class="switch"><input type="checkbox" data-preal="${it.id}" ${it.realistic ? 'checked' : ''} ${locked ? 'disabled' : ''}><span class="tr"></span><b>AI label on</b></label><span class="muted grow tiny" style="margin:0">On when the picture looks like a real photograph (Meta's toggle says realistic AI photos need the label). Off for illustrations and clearly stylized art.</span></div>
+        ${pub}
+      </div></div></div>`;
+  }).join('');
+  $('#view-poster').innerHTML = `<h1>Poster</h1><p class="sub">Picture posts for your Facebook Page (and Instagram if you want). Claude Opus writes the ideas, Google Flow makes a square picture, the app darkens it with a vignette and Claude writes a hook caption in front, then you approve and post now or schedule it.</p>
+  <h2 style="margin-top:0">1 · Choose your niche</h2><div class="grid">${niches}</div>
+  ${P0.niche === 'custom' ? `<label class="f">Describe your niche</label><input type="text" id="pCustom" value="${esc(P0.custom)}" placeholder="e.g. dog memes, real estate tips, cozy gaming…">` : ''}
+  <h2>2 · Ideas</h2>
+  <div class="card"><div class="row"><div class="grow"><b>5 fresh ${esc((S.posterNiches.find((n) => n.id === P0.niche) || {}).name || '')} ideas</b><div class="muted">Claude Opus writes 5 new ideas every time you press Create, different from everything it made before.${(S.posterNiches.find((n) => n.id === P0.niche) || {}).web ? ' It checks the latest news online first.' : ''}</div></div>
+    <button class="btn" id="pIdeas" ${busy ? 'disabled' : ''}>Create</button></div></div>
+  ${ideas ? `${ideas}<div class="row"><button class="btn" id="pMake" ${!P0.pick || busy ? 'disabled' : ''}>Make this picture in Google Flow</button><span class="muted">Claude opens Flow in Chrome, makes the picture, downloads the project and adds it below.</span></div>` : ''}
+  <h2>3 · Edit, approve &amp; post</h2>
+  ${cards || '<p class="muted">Your posters appear here after you pick an idea.</p>'}`;
+
+  document.querySelectorAll('[data-pniche]').forEach((b) => (b.onclick = () => call('posterSettings', { niche: b.dataset.pniche })));
+  const pc = $('#pCustom'); if (pc) pc.onchange = (e) => call('posterSettings', { custom: e.target.value });
+  $('#pIdeas').onclick = () => call('posterIdeas');
+  document.querySelectorAll('[data-pidea]').forEach((d) => (d.onclick = () => { const id = P0.pick === d.dataset.pidea ? null : d.dataset.pidea; S.poster.pick = id; render(); call('posterSettings', { pick: id }); }));
+  const mk = $('#pMake'); if (mk) mk.onclick = async () => { mk.disabled = true; await call('posterCreate', P0.pick); };
+  const item = (id) => S.poster.items[id];
+  const redraw = (id) => { const cv = document.querySelector(`canvas[data-pcv="${id}"]`), it = item(id); if (cv && it) drawPoster(cv, posterImg(id, it.variant), it.text); };
+  document.querySelectorAll('[data-pt]').forEach((i) => {
+    const [id, f] = i.dataset.pt.split('|');
+    const val = () => (f === 'size' || f === 'dark' ? +i.value : i.value);
+    i.oninput = () => { item(id).text[f] = val(); redraw(id); };
+    i.onchange = () => call('posterUpdate', id, { text: { [f]: val() } });
+  });
+  document.querySelectorAll('[data-pck]').forEach((i) => (i.onchange = () => { const [id, f] = i.dataset.pck.split('|'); item(id).text[f] = i.checked; redraw(id); call('posterUpdate', id, { text: { [f]: i.checked } }); }));
+  document.querySelectorAll('[data-pseg]').forEach((b) => (b.onclick = () => {
+    const [id, key, v] = b.dataset.pseg.split('|');
+    if (key === 'mode') { item(id).mode = v; render(); return call('posterUpdate', id, { mode: v }); }
+    item(id).text[key] = v; redraw(id); call('posterUpdate', id, { text: { [key]: v } });
+  }));
+  document.querySelectorAll('[data-pc]').forEach((i) => (i.onchange = () => { const [id, f] = i.dataset.pc.split('|'); call('posterUpdate', id, { [f]: i.value }); }));
+  document.querySelectorAll('[data-preal]').forEach((i) => (i.onchange = () => call('posterUpdate', i.dataset.preal, { realistic: i.checked })));
+  document.querySelectorAll('[data-pvar]').forEach((c) => (c.onclick = () => { const [id, f] = c.dataset.pvar.split('|'); item(id).variant = f; render(); call('posterUpdate', id, { variant: f }); }));
+  document.querySelectorAll('[data-pplat]').forEach((i) => (i.onchange = () => { const [id, pl] = i.dataset.pplat.split('|'); const p = { ...item(id).platforms, [pl]: i.checked }; item(id).platforms = p; call('posterUpdate', id, { platforms: p }); }));
+  document.querySelectorAll('[data-pnote]').forEach((i) => { i.oninput = () => { pNotes[i.dataset.pnote] = i.value; }; i.onkeydown = (e) => { if (e.key === 'Enter') { const b = document.querySelector(`[data-prev="${i.dataset.pnote}"]`); if (b && !b.disabled) b.click(); } }; });
+  document.querySelectorAll('[data-prev]').forEach((b) => (b.onclick = () => { const id = b.dataset.prev, n = pNotes[id] || ''; delete pNotes[id]; call('posterRevise', id, n); }));
+  document.querySelectorAll('[data-pregen]').forEach((b) => (b.onclick = () => { b.disabled = true; call('posterRegen', b.dataset.pregen); }));
+  document.querySelectorAll('[data-pfold]').forEach((b) => (b.onclick = () => call('posterFolder', b.dataset.pfold)));
+  document.querySelectorAll('[data-pdel]').forEach((b) => (b.onclick = () => { if (confirm('Remove this poster and its pictures from the app?')) call('posterDiscard', b.dataset.pdel); }));
+  document.querySelectorAll('[data-pretry]').forEach((b) => (b.onclick = () => { const [id, pl] = b.dataset.pretry.split('|'); call('posterRetry', id, pl); }));
+  document.querySelectorAll('[data-pjob]').forEach((b) => (b.onclick = () => call('posterRetryJob', b.dataset.pjob)));
+  document.querySelectorAll('[data-ppub]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.ppub, it = item(id), img = posterImg(id, it.variant);
+    const where = ['facebook', 'instagram'].filter((p) => it.platforms[p]).map((p) => (p === 'facebook' ? `Facebook Page "${S.settings.fbPage}"` : 'Instagram'));
+    if (!where.length) return alert('Choose Facebook, Instagram or both.');
+    if (!img) return alert('The picture is still loading. Try again in a second.');
+    if (!confirm(`${it.mode === 'now' ? 'Post this picture NOW' : `Schedule this picture for ${S.posterSlot ? S.posterSlot.local : 'the next US prime-time slot'}`} on ${where.join(' and ')}?`)) return;
+    b.disabled = true;
+    const cv = document.createElement('canvas'); cv.width = PW; cv.height = PH; drawPoster(cv, img, it.text);
+    if (await call('posterSave', id, cv.toDataURL('image/jpeg', 0.92))) await call('posterPublish', id);
+  }));
+  drawPosters();
+}
+
 // ---------- builder ----------
 const CAT = { 'art-style': 'Art style', palette: 'Colour palette', camera: 'Camera', pacing: 'Pacing', hook: 'Hook', narrative: 'Storytelling', captions: 'Captions', audio: 'Audio', other: 'Other' };
 function renderBuilder() {
@@ -390,7 +599,7 @@ function render() {
   if ([...document.querySelectorAll('#view-' + view + ' video')].some((v) => !v.paused && !v.ended)) return; // rebuilding would restart the video
   const el = document.activeElement;
   if (el && ['TEXTAREA', 'INPUT'].includes(el.tagName) && el.type !== 'range' && $('#view-' + view).contains(el)) return; // don't clobber typing
-  ({ setup: renderSetup, create: renderCreate, builder: renderBuilder, music: renderMusic, upload: renderUpload, settings: renderSettings })[view]();
+  ({ setup: renderSetup, create: renderCreate, poster: renderPoster, builder: renderBuilder, music: renderMusic, upload: renderUpload, settings: renderSettings })[view]();
 }
 window.api.on('state', (s) => { S = s; render(); renderMeter(S.progress); });
 window.api.on('progress', (p) => { if (S) S.progress = p; renderMeter(p); });

@@ -15,3 +15,6 @@ Exceptions:
 - If a platform adds a label automatically, leave it. Never alter or re-upload a file to get rid of one.
 
 The upload prompts in `lib/prompts.js` (`AI_NOTE` and the TikTok task) must stay in line with this rule.
+
+## Poster tab (standing rule)
+Picture posts are always a square 1:1 Flow image, darkened with a vignette by the app, with ONE hook caption in front (no second line, no footer). Default look: centered rounded-bold white ALL CAPS caption, no outline (the user's reference). Motivational = luxury "dream life" pictures (cash, cars, watches) for a young audience; photorealistic pictures get the AI label on. See `lib/posters.js`, `lib/posterPrompts.js` and `drawPoster` in `renderer/app.js`.

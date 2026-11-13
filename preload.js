@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   review: call('review'), addMemory: call('addMemory'), toggleMemory: call('toggleMemory'), removeMemory: call('removeMemory'), customSlot: call('customSlot'), fix: call('fix'), approveFix: call('approveFix'), discardFix: call('discardFix'), retryUpload: call('retryUpload'),
   retryProduce: call('retryProduce'), redo: call('redo'), continueVideo: call('continueVideo'), alertRetry: call('alertRetry'), alertFix: call('alertFix'), alertApply: call('alertApply'), alertDismiss: call('alertDismiss'), dataInfo: call('dataInfo'), backupNow: call('backupNow'),
   appInfo: call('appInfo'), updateCheck: call('updateCheck'), updateInstall: call('updateInstall'),
+  posterSettings: call('posterSettings'), posterIdeas: call('posterIdeas'), posterCreate: call('posterCreate'), posterRegen: call('posterRegen'), posterImage: call('posterImage'), posterUpdate: call('posterUpdate'), posterRevise: call('posterRevise'), posterSave: call('posterSave'), posterPublish: call('posterPublish'), posterRetry: call('posterRetry'), posterRetryJob: call('posterRetryJob'), posterDiscard: call('posterDiscard'), posterFolder: call('posterFolder'),
   openFolder: call('openFolder'), openUrl: call('openUrl'),
   on: (ch, fn) => ipcRenderer.on(ch, (_e, d) => fn(d)),
 });
