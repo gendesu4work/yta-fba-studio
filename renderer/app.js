@@ -390,7 +390,7 @@ function renderPoster() {
         <div class="row" style="margin-top:8px"><label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|facebook" ${it.platforms.facebook ? 'checked' : ''}><span>Facebook Page <span class="muted">(${esc(S.settings.fbPage || 'set the Page name in Setup')})</span></span></label>
           <label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|instagram" ${it.platforms.instagram ? 'checked' : ''}><span>Also post the same picture on Instagram</span></label></div>
         <div class="row" style="margin-top:10px">${seg('mode', it.mode, [['now', 'Post now'], ['schedule', 'Schedule for best US time']])}
-          <span class="muted grow">${it.mode === 'now' ? 'Goes live as soon as you approve.' : slot ? `Next US prime-time slot: <b style="color:var(--text)">${esc(slot.local)}</b> (${esc(slot.et)}).${it.platforms.instagram ? ' Facebook schedules it natively; Instagram is posted by the app at that time (keep the app and Chrome open).' : ''}` : ''}</span></div>
+          <span class="muted grow">${it.mode === 'now' ? 'Goes live as soon as you approve.' : slot ? `Next US prime-time slot: <b style="color:var(--text)">${esc(slot.local)}</b> (${esc(slot.et)}). The app posts it at that time, so keep the app and Chrome open.` : ''}</span></div>
         <div class="muted tiny">After it goes live, the app adds your engagement question as a comment from the same account.</div>
         <div class="row" style="margin-top:10px"><button class="btn" data-ppub="${it.id}" ${busy || it.status === 'generating' ? 'disabled' : ''}>${it.mode === 'now' ? 'Approve &amp; post now' : 'Approve &amp; schedule'}</button></div></div>`;
     return `<div class="card">${head}
