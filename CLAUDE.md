@@ -1,6 +1,6 @@
 # YTA and FBA Studio
 
-Electron app (`main.js`, `preload.js`, `renderer/`, `lib/`) that turns a niche into scheduled short-form stickman animations. Upload and comment instructions for Claude in Chrome live in `lib/prompts.js`.
+Electron app (`main.js`, `preload.js`, `renderer/`, `lib/`) that turns a niche into scheduled short-form stickman animations. Upload instructions for Claude in Chrome live in `lib/prompts.js`.
 
 ## AI-content label when posting (standing rule)
 Leave the AI label **unchecked** on every platform:
