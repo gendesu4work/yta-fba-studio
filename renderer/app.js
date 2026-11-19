@@ -4,6 +4,23 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const fileUrl = (p) => 'file:///' + encodeURI(p.replace(/\\/g, '/'));
 let view = 'setup';
 
+// ---------- opening intro: the NMHQ sketch draws itself, then flies to its place at the top left ----------
+(() => {
+  const ov = $('#intro'), img = ov.querySelector('img'), mark = $('#brandMark');
+  const end = () => { document.body.classList.remove('intro'); ov.remove(); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return end();
+  let flying = false;
+  const fly = () => {
+    if (flying) return; flying = true;
+    const a = img.getBoundingClientRect(), b = mark.getBoundingClientRect();
+    img.style.transform = `translate(${b.left - a.left}px, ${b.top - a.top}px) scale(${b.width / a.width})`;
+    ov.classList.add('fly');
+    setTimeout(end, 950);
+  };
+  ov.addEventListener('click', () => { img.src = 'logo-nmhq.svg'; fly(); }); // click to skip: the finished logo, not a half-drawn one
+  setTimeout(fly, 4300); // the sketch takes about 3.8 s
+})();
+
 async function call(name, ...a) {
   const r = await window.api[name](...a);
   if (!r.ok) { alert(r.error); return null; }
@@ -28,6 +45,26 @@ window.addEventListener('blur', () => { ptrDown = false; });
 // ---------- navigation ----------
 document.querySelectorAll('.nav').forEach((b) => b.addEventListener('click', () => { view = b.dataset.view; show(); }));
 $('#openFolder').onclick = () => call('openFolder', '');
+$('#joinDiscord').onclick = () => call('openUrl', 'https://discord.gg/UdpUhgYKcf'); // opens in the default browser
+
+// little sparks twinkling at random spots over the header text and logo
+(() => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const wrap = $('#community .cwrap');
+  const spark = () => {
+    if (!document.hidden) {
+      const s = document.createElement('i'); s.className = 'spark';
+      s.style.left = (Math.random() * 100).toFixed(1) + '%';
+      s.style.top = (10 + Math.random() * 80).toFixed(1) + '%';
+      s.style.setProperty('--s', (6 + Math.random() * 7).toFixed(1) + 'px');
+      s.style.setProperty('--d', (0.7 + Math.random() * 0.6).toFixed(2) + 's');
+      s.addEventListener('animationend', () => s.remove());
+      wrap.appendChild(s);
+    }
+    setTimeout(spark, 350 + Math.random() * 900);
+  };
+  spark();
+})();
 $('#mStop').onclick = () => call('cancel');
 function show() {
   document.querySelectorAll('.nav').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
@@ -222,7 +259,7 @@ function renderUpload() {
       </div></div>${retryPanel(slug, p, busy)}${fixBlock}</div>`;
   }).join('');
   const failed = recs.filter(([, p]) => p.status === 'failed').map(([slug, p]) => `<div class="card"><div class="row"><b class="grow">${esc(p.post.title)}</b><span class="badge failed">failed</span>${contBtn(slug, busy)}<button class="btn small" data-retryprod="${slug}" ${busy ? 'disabled' : ''}>Retry</button></div><div class="muted">${esc(p.error || '')}</div></div>`).join('');
-  const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>${j.kind === 'post' ? 'Instagram post' : j.platform + ' comment'} · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
+  const jobs = S.jobs.filter((j) => j.status !== 'done').map((j) => `<div class="plat"><span class="badge ${j.status}">${j.status}</span>Instagram post · ${esc((S.posts[j.slug] || { post: { title: j.slug } }).post.title)} · ${new Date(j.runAt).toLocaleString()} ${j.status === 'failed' ? `<button class="ghost small" data-retry="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button><span class="muted">${esc((j.detail || '').slice(0, 120))}</span>` : ''}</div>`).join('');
   $('#view-upload').innerHTML = `<h1>Upload &amp; Schedule</h1><p class="sub">Times are chosen for US audiences across the day (morning to late evening Eastern), spaced hours apart, and re-checked against the clock right before each upload. ${S.settings.autoApprove ? '<b>Auto approve is on</b>, so finished videos schedule themselves.' : ''}</p>
   <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="jitter" ${S.settings.slotJitter !== false ? 'checked' : ''}><span class="tr"></span><b>Vary the minutes</b></label><span class="muted grow">Posts go out at natural-looking times (like 12:17 or 7:42 PM ET) instead of exactly on the hour. Or pick your own time on each video.</span></div></div>
   <div class="card"><div class="row"><label class="switch"><input type="checkbox" id="parup" ${S.settings.parallelUploads !== false ? 'checked' : ''}><span class="tr"></span><b>Upload to all platforms at once</b></label><span class="muted grow">YouTube, TikTok and Facebook are filled in at the same time in separate Chrome tabs. Turn it off if Chrome gets confused (they then go one after another).</span></div></div>
@@ -384,14 +421,12 @@ function renderPoster() {
     const thumbs = it.variants.length > 1 ? `<div class="pvars">${it.variants.map((f) => `<canvas width="108" height="108" class="${f === it.variant ? 'on' : ''}" data-pth="${it.id}|${f}" data-pvar="${it.id}|${f}" title="Use this picture"></canvas>`).join('')}</div>` : '';
     const seg = (key, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-pseg="${it.id}|${key}|${v}" class="${String(cur) === String(v) ? 'on' : ''}" ${locked ? 'disabled' : ''}>${l}</button>`).join('')}</div>`;
     const up = it.upload ? Object.entries(it.upload).map(([pl, u]) => `<div class="plat"><span class="badge ${u.status}">${u.status}</span><b>${pl === 'facebook' ? 'Facebook Page' : 'Instagram'}</b>${u.when ? `<span class="muted">${fmtWhen(u.when)}</span>` : ''}<span class="muted grow" style="min-width:0">${esc((u.detail || '').slice(0, 140))}</span>${['failed', 'stopped'].includes(u.status) ? `<button class="ghost small" data-pretry="${it.id}|${pl}" ${busy ? 'disabled' : ''}>Retry</button>` : ''}</div>`).join('') : '';
-    const pj = (P0.jobs || []).filter((j) => j.item === it.id && j.kind === 'comment').map((j) => `<div class="plat"><span class="badge ${j.status === 'done' ? 'posted' : j.status}">${j.status === 'done' ? 'commented' : j.status}</span><span class="muted">${j.platform === 'facebook' ? 'Facebook' : 'Instagram'} comment · ${new Date(j.runAt).toLocaleString()}</span>${j.status === 'failed' ? `<button class="ghost small" data-pjob="${esc(j.id)}" ${busy ? 'disabled' : ''}>Retry</button>` : ''}</div>`).join('');
-    const pub = locked ? `<div class="fixbox"><b>${it.mode === 'now' ? 'Posted now' : `Scheduled for ${it.slot ? fmtWhen(it.slot) : '…'}`}</b>${it.slot ? `<span class="muted"> · US prime time</span>` : ''}${up}${pj}</div>`
+    const pub = locked ? `<div class="fixbox"><b>${it.mode === 'now' ? 'Posted now' : `Scheduled for ${it.slot ? fmtWhen(it.slot) : '…'}`}</b>${it.slot ? `<span class="muted"> · US prime time</span>` : ''}${up}</div>`
       : `<div class="fixbox"><b>Approve &amp; post</b>
         <div class="row" style="margin-top:8px"><label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|facebook" ${it.platforms.facebook ? 'checked' : ''}><span>Facebook Page <span class="muted">(${esc(S.settings.fbPage || 'set the Page name in Setup')})</span></span></label>
           <label class="row" style="gap:8px"><input type="checkbox" data-pplat="${it.id}|instagram" ${it.platforms.instagram ? 'checked' : ''}><span>Also post the same picture on Instagram</span></label></div>
         <div class="row" style="margin-top:10px">${seg('mode', it.mode, [['now', 'Post now'], ['schedule', 'Schedule for best US time']])}
           <span class="muted grow">${it.mode === 'now' ? 'Goes live as soon as you approve.' : slot ? `Next US prime-time slot: <b style="color:var(--text)">${esc(slot.local)}</b> (${esc(slot.et)}). The app posts it at that time, so keep the app and Chrome open.` : ''}</span></div>
-        <div class="muted tiny">After it goes live, the app adds your engagement question as a comment from the same account.</div>
         <div class="row" style="margin-top:10px"><button class="btn" data-ppub="${it.id}" ${busy || it.status === 'generating' ? 'disabled' : ''}>${it.mode === 'now' ? 'Approve &amp; post now' : 'Approve &amp; schedule'}</button></div></div>`;
     return `<div class="card">${head}
       <div class="pedit"><div class="pleft"><canvas width="${PW}" height="${PH}" data-pcv="${it.id}" class="pcanvas"></canvas>${thumbs}
@@ -409,7 +444,6 @@ function renderPoster() {
         </div>
         ${locked ? '' : `<label class="f">Ask Claude to change the text</label><div class="row"><input type="text" class="grow" data-pnote="${it.id}" value="${esc(pNotes[it.id] || '')}" placeholder="e.g. make it funnier, shorter, more urgent, move it to the bottom"><button class="ghost" data-prev="${it.id}" ${busy ? 'disabled' : ''}>Edit with Claude</button></div>`}
         <label class="f">Caption (short line + a few hashtags)</label><input type="text" data-pc="${it.id}|caption" value="${esc(it.caption)}" ${locked ? 'disabled' : ''}>
-        <label class="f">Engagement comment (posted from the same account after it goes live)</label><input type="text" data-pc="${it.id}|comment" value="${esc(it.comment)}" ${locked ? 'disabled' : ''}>
         ${it.idea.source ? `<div class="muted tiny">Source: ${esc(it.idea.source)}</div>` : ''}
         <div class="row" style="margin-top:12px"><label class="switch"><input type="checkbox" data-preal="${it.id}" ${it.realistic ? 'checked' : ''} ${locked ? 'disabled' : ''}><span class="tr"></span><b>AI label on</b></label><span class="muted grow tiny" style="margin:0">On when the picture looks like a real photograph (Meta's toggle says realistic AI photos need the label). Off for illustrations and clearly stylized art.</span></div>
         ${pub}
@@ -520,8 +554,8 @@ function renderMusic() {
 // ---------- settings ----------
 const ACCENTS = ['#00a2ff', '#7c5cff', '#16a34a', '#f59e0b', '#ec4899', '#64748b'];
 function applyTheme() {
-  const s = S.settings; const dark = s.theme === 'dark' || (s.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const s = S.settings;
+  document.documentElement.dataset.theme = 'dark'; // always dark: it goes with the painted background
   document.documentElement.style.setProperty('--accent', s.accent || '#00a2ff');
 }
 let account = null, appInfo = {};
@@ -531,8 +565,7 @@ function renderSettings() {
   const seg = (id, cur, opts) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-v="${v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   $('#view-settings').innerHTML = `<h1>Settings</h1><p class="sub">Appearance, window and account.</p>
   <h2 style="margin-top:0">Appearance</h2>
-  <div class="card"><div class="row"><div class="grow"><b>Theme</b><div class="muted">Light, dark, or follow Windows.</div></div>${seg('theme', s.theme, [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']])}</div>
-    <div class="row" style="margin-top:14px"><div class="grow"><b>Accent colour</b></div><div class="swatches">${ACCENTS.map((c) => `<div class="sw ${s.accent === c ? 'on' : ''}" data-ac="${c}" style="background:${c}"></div>`).join('')}</div></div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Accent colour</b></div><div class="swatches">${ACCENTS.map((c) => `<div class="sw ${s.accent === c ? 'on' : ''}" data-ac="${c}" style="background:${c}"></div>`).join('')}</div></div></div>
   <h2>Window</h2>
   <div class="card"><div class="row"><div class="grow"><b>Window mode</b><div class="muted">Windowed, full screen (F11 or Esc to leave), or borderless (no title bar, fills the screen).</div></div>${seg('winmode', s.windowMode || 'window', [['window', 'Windowed'], ['fullscreen', 'Full screen'], ['borderless', 'Borderless']])}</div></div>
   <h2>Claude account</h2>
@@ -540,12 +573,11 @@ function renderSettings() {
     <div class="row" style="margin-top:12px">${account && account.loggedIn ? '<button class="danger" id="logout">Log out</button>' : '<button class="btn" id="login">Log in with Claude</button>'}<span class="muted tiny" style="margin:0">Log out to switch to a different Claude account. After logging in, run the Setup check again.</span></div></div>
   <h2>Updates</h2>
   <div class="card"><div class="kv"><b>Version</b><span>${esc(appInfo.version || '')}</span></div><div class="kv"><b>Status</b><span><span class="badge ${/^Up to date/.test(s.updateStatus || '') ? 'done' : /fail|Could not/.test(s.updateStatus || '') ? 'failed' : /Download|Install|Checking|available/.test(s.updateStatus || '') ? 'waiting' : ''}">${esc(s.updateStatus || 'Not checked yet')}</span></span></div><div class="kv"><b>Last checked</b><span>${s.lastUpdateCheck ? new Date(s.lastUpdateCheck).toLocaleString() : 'never'}</span></div>
-    <div class="row" style="margin-top:12px"><button class="btn" id="upd" ${/Checking|Downloading|Installing/.test(s.updateStatus || '') ? 'disabled' : ''}>Check for updates</button>${s.updateAvailable && !/Downloading|Installing|downloaded/.test(s.updateStatus || '') ? `<button class="btn" id="updGo" style="background:#16a34a">Update app to ${esc(s.updateAvailable)}</button>` : ''}<span class="muted tiny" style="margin:0">The app checks GitHub every 7 days and installs new versions automatically when it is idle.</span></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="upd" ${/Checking|Downloading|Installing/.test(s.updateStatus || '') ? 'disabled' : ''}>Check for updates</button>${s.updateAvailable && !/Downloading|Installing|downloaded/.test(s.updateStatus || '') ? `<button class="btn" id="updGo" style="background:#16a34a">Update app to ${esc(s.updateAvailable)}</button>` : ''}<span class="muted tiny" style="margin:0">The app checks GitHub every time it opens and installs new versions automatically when it is idle.</span></div></div>
   <h2>Your data</h2>
   <div class="card" id="dataCard"><span class="muted">Loading…</span></div>
   <h2>Usage today</h2>
   <div class="card"><div class="kv"><b>Claude runs</b><span>${u.runs}</span></div><div class="kv"><b>Tokens used</b><span>≈ ${fmtTok(u.fresh)} (plus ${fmtTok(u.cached)} cheap cached reads)</span></div><div class="muted tiny">Measured from each Claude run the app starts. Browser steps use the most; Sonnet uses far less than Opus.</div></div>`;
-  document.querySelectorAll('#theme button').forEach((b) => (b.onclick = () => call('settings', { theme: b.dataset.v })));
   document.querySelectorAll('[data-ac]').forEach((b) => (b.onclick = () => call('settings', { accent: b.dataset.ac })));
   document.querySelectorAll('#winmode button').forEach((b) => (b.onclick = () => call('winMode', b.dataset.v)));
   window.api.dataInfo().then((r) => { const d = r.ok && r.data; const el = $('#dataCard'); if (!d || !el) return; const gb = d.bytes / 1e9, sz = gb >= 1 ? gb.toFixed(1) + ' GB' : Math.round(d.bytes / 1e6) + ' MB';

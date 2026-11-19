@@ -1,12 +1,19 @@
 :root{--bg:#f7f8fa;--panel:#fff;--panel2:#f1f3f6;--line:#e4e7ec;--text:#111827;--muted:#6b7280;--accent:#00a2ff;--accent-d:color-mix(in srgb,var(--accent) 82%,#000);--accent-s:color-mix(in srgb,var(--accent) 13%,transparent);--ok:#15803d;--ok-s:#e7f6ec;--bad:#b91c1c;--bad-s:#fdecec;--warn:#a16207;--warn-s:#fdf4dc}
 html[data-theme=dark]{--bg:#0e1116;--panel:#161a21;--panel2:#1e232c;--line:#2a303b;--text:#e8ebf0;--muted:#8d95a5;--ok:#4ade80;--ok-s:#12281b;--bad:#f87171;--bad-s:#2c1517;--warn:#fbbf24;--warn-s:#2b2410;--accent-d:color-mix(in srgb,var(--accent) 75%,#fff)}
-html[data-theme=dark] .btn{color:#fff}html[data-theme=dark] .btn:hover{background:color-mix(in srgb,var(--accent) 85%,#fff)}html[data-theme=dark] .seg button.on{background:var(--line)}html[data-theme=dark] .brand img{background:#fff;border-radius:9px;padding:2px}
+html[data-theme=dark] .btn{color:#fff}html[data-theme=dark] .btn:hover{background:color-mix(in srgb,var(--accent) 85%,#fff)}html[data-theme=dark] .seg button.on{background:var(--line)}html[data-theme=light] .brand img{filter:invert(1)} /* the logos are white; black on the light theme */
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Segoe UI",system-ui,sans-serif;overflow:hidden}
 body{display:grid;grid-template-columns:236px 1fr;grid-template-rows:1fr auto}
 aside{grid-row:1/3;background:var(--panel);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:18px}
-.brand{display:flex;gap:11px;align-items:center;padding:0 6px 6px}.brand img{width:40px;height:40px}
-.brand b{display:block;font-size:14px;line-height:1.2}.brand small{display:block;color:var(--muted);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;margin-top:3px;white-space:nowrap}
+.brand{display:flex;gap:12px;align-items:center;padding:0 6px 6px}.brand img{display:block}
+.brand .mk{width:66px;height:22px}.brand .nm{width:98px;height:46px}.brand .sep{width:1px;height:30px;background:var(--line)}
+/* Opening intro: the NMHQ sketch plays full screen, then flies into the sidebar (see app.js) */
+#intro{position:fixed;inset:0;z-index:15;background:#0b0b0d;display:grid;place-items:center;cursor:pointer;transition:background-color .8s ease}
+#intro img{width:min(62vw,820px);transform-origin:0 0;transition:transform .9s cubic-bezier(.7,0,.2,1),filter .9s ease}
+#intro.fly{background-color:transparent;pointer-events:none}
+html[data-theme=light] #intro.fly img{filter:invert(1)}
+body.intro #tbar{z-index:16}body.intro .brand .mk{visibility:hidden}
+@media (prefers-reduced-motion:reduce){#intro{display:none}body.intro .brand .mk{visibility:visible}}
 nav{display:flex;flex-direction:column;gap:2px}
 .nav{background:none;border:0;color:var(--muted);text-align:left;padding:9px 12px;border-radius:8px;font:inherit;cursor:pointer;border-left:3px solid transparent}
 .nav:hover{background:var(--panel2);color:var(--text)}.nav.active{background:var(--accent-s);color:var(--accent-d);font-weight:600;border-left-color:var(--accent)}
@@ -122,3 +129,39 @@ input[type=color]{width:48px;height:34px;border:1px solid var(--line);border-rad
 .ck.pradio{border-radius:50%}
 .seg button:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:1180px){.pedit{grid-template-columns:minmax(0,1fr)}.pleft{max-width:420px;margin:0 auto;width:100%}.pgrid{grid-template-columns:minmax(0,1fr)}}
+/* ---------- background (navy torn-wall money art, 2K): lightly darkened, vignetted, grainy; panels are navy glass over it ---------- */
+html{background:#05070d}body{background:transparent}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:url(bg.jpg) center/cover no-repeat;filter:brightness(.46) saturate(.9) contrast(1.05)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+  radial-gradient(ellipse 85% 80% at 55% 46%,rgba(2,4,10,.15) 30%,rgba(2,4,10,.55) 72%,rgba(2,4,10,.9) 100%)}
+html[data-theme=dark]{--panel:rgba(9,13,26,.7);--panel2:rgba(160,180,230,.07);--line:rgba(170,190,235,.11);--text:#eef1f7;--muted:#97a1b8}
+aside{background:rgba(5,8,18,.55);backdrop-filter:blur(20px) saturate(1.15)}
+#meter{background:rgba(5,8,18,.6);backdrop-filter:blur(20px) saturate(1.15)}
+.card{backdrop-filter:blur(12px) saturate(1.1);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.dlg{background:rgba(9,13,26,.93);backdrop-filter:blur(20px)}#modal{background:rgba(0,0,0,.6)}
+main h1{text-shadow:0 2px 14px rgba(0,0,0,.7)}main .sub,main .view>h2{text-shadow:0 1px 10px rgba(0,0,0,.85)}
+select option{background:#0c1120;color:#eef1f7}
+/* frosted blur behind every control and tile, so text never sits on the sharp picture */
+.niche,.idea,.ghost,.danger,.seg,.retryopt,.daily,.tag,.badge,.chip,.dot,input[type=text],textarea,select,input[type=color]{backdrop-filter:blur(12px) saturate(1.1)}
+/* loose text directly on the background gets its own frosted backing */
+main .view>h1,main .view>.sub,main .view>h2,main label.f,main .view>.muted,main .view>p{width:fit-content;max-width:100%;background:rgba(5,8,18,.55);backdrop-filter:blur(12px);border-radius:8px;padding:3px 10px;margin-left:-10px}
+main .view>.sub{padding:5px 10px}
+.card label.f,.dlg label.f,.niche label.f{background:none;backdrop-filter:none;padding:0;margin-left:0}
+/* community header: stays pinned to the top of the page area while scrolling */
+#community{position:sticky;top:-30px;z-index:6;display:flex;align-items:center;gap:14px;margin:-30px -40px 22px;padding:11px 40px;background:rgba(4,6,14,.78);backdrop-filter:blur(20px) saturate(1.2);border-bottom:1px solid rgba(255,196,40,.22);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+#community img{width:34px;height:34px;flex:none;filter:drop-shadow(0 0 8px rgba(255,190,30,.45))}
+#community span{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;background:linear-gradient(90deg,#fff3c4,#ffc928 45%,#f0a500);-webkit-background-clip:text;background-clip:text;color:transparent}
+#community .join{margin-left:auto;border:0;border-radius:8px;padding:8px 22px;font-weight:700;letter-spacing:.06em;color:#1a1200;background:linear-gradient(180deg,#ffe27a,#f5b400 55%,#d99400);box-shadow:0 0 16px rgba(255,190,30,.35),inset 0 1px 0 rgba(255,255,255,.5);transition:filter .15s,transform .15s}
+#community .join:hover{filter:brightness(1.1);transform:translateY(-1px)}#community .join:active{transform:none}
+body.borderless #community{padding-right:110px}
+/* header text: idle hand-drawn "boil" (the outline wobbles a few times a second) plus a loose pencil outline that jitters */
+#community .cwrap{position:relative;display:flex;align-items:center;gap:14px}
+#community .ctext{position:relative;filter:url(#boil)}
+#community .ctext::after{content:attr(data-text);position:absolute;inset:0;pointer-events:none;color:transparent;background:none;-webkit-text-stroke:.6px rgba(255,215,90,.55);animation:sketchJit .75s steps(1) infinite}
+@keyframes sketchJit{0%{transform:translate(.7px,-.5px)}16%{transform:translate(-.6px,.6px)}33%{transform:translate(.5px,.7px)}50%{transform:translate(-.7px,-.4px)}66%{transform:translate(.4px,-.7px)}83%{transform:translate(-.5px,.5px)}}
+/* little sparks that twinkle around the text and logo */
+#community .spark{position:absolute;width:var(--s,9px);height:var(--s,9px);margin:calc(var(--s,9px)/-2) 0 0 calc(var(--s,9px)/-2);pointer-events:none;filter:drop-shadow(0 0 3px rgba(255,200,60,.95)) drop-shadow(0 0 7px rgba(255,170,20,.6));animation:twinkle var(--d,.9s) ease-in-out forwards}
+#community .spark::before{content:"";position:absolute;inset:0;background:radial-gradient(circle,#fffbe6 0 22%,#ffd34d 60%);clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%)}
+@keyframes twinkle{0%{opacity:0;transform:scale(.2) rotate(0)}40%{opacity:1;transform:scale(1) rotate(45deg)}100%{opacity:0;transform:scale(.3) rotate(110deg) translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){#community .ctext{filter:none}#community .ctext::after{animation:none}#community .spark{display:none}}

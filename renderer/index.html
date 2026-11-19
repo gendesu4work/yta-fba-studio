@@ -1,15 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; media-src 'self' file:; style-src 'self' 'unsafe-inline'">
 <title>YTA and FBA Studio</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="intro">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="boil" x="-5%" y="-30%" width="110%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="1"><animate attributeName="seed" values="1;2;3;4;5;6" dur="0.75s" calcMode="discrete" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter></svg>
+<div id="intro" title="Click to skip"><img src="logo-nmhq-sketch.svg" alt="NMHQ"></div>
 <div id="tbar"><button id="tmin" title="Minimize">&#8211;</button><button id="tclose" class="x" title="Close">&#10005;</button></div>
 <aside id="side">
-  <div class="brand"><img src="logo.png" alt=""><div><b>YTA and FBA Studio</b><small>Powered by NEXUS MEDIA</small></div></div>
+  <div class="brand"><img class="mk" id="brandMark" src="logo-nmhq.svg" alt="NMHQ"><span class="sep"></span><img class="nm" src="logo-nexus-media.svg" alt="Nexus Media"></div>
   <nav>
     <button data-view="setup" class="nav active">Setup</button>
     <button data-view="create" class="nav">Create</button>
@@ -24,6 +26,7 @@
 </aside>
 
 <main>
+  <header id="community"><div class="cwrap"><img src="community-mark.png" alt=""><span class="ctext" data-text="Join the Discord channel for the community">Join the Discord channel for the community</span></div><button class="join" id="joinDiscord">Join</button></header>
   <section id="view-setup" class="view active"></section>
   <section id="view-create" class="view"></section>
   <section id="view-poster" class="view"></section>

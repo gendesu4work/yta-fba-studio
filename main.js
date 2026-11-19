@@ -12,7 +12,7 @@ function createWindow(m = 'window') {
   const old = win; mode = m;
   const { screen } = require('electron');
   const opts = {
-    width: 1280, height: 860, minWidth: 1000, minHeight: 700, backgroundColor: '#f7f8fa', title: 'YTA and FBA Studio',
+    width: 1280, height: 860, minWidth: 1000, minHeight: 700, backgroundColor: '#0b0b0d', title: 'YTA and FBA Studio',
     icon: path.join(__dirname, 'build', 'icon.ico'), show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   };
