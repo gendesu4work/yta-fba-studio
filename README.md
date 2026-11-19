@@ -20,7 +20,7 @@ reference videos), **Music**, **Upload & Schedule** (US prime-time slots), **Set
 Your data lives in `Documents\Shorts Studio`.
 
 ## Auto-update
-The installed app checks this repository's Releases every 7 days and installs new versions silently when idle.
+The installed app checks this repository's Releases every time it opens and installs new versions silently when idle.
 
 ## Publishing a new version
 ```bash
